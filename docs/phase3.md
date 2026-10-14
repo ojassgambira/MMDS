@@ -1,5 +1,10 @@
 # Phase 3 recommendations
 
+The [automated cloud workflow](colab.md) now implements initial graph-only
+chronological baselines, metrics and hash-verified stage resumption. Its
+[verification record](automation-verification.md) distinguishes generated test
+execution from real Elliptic and Colab execution, which remain separate gates.
+
 1. Gate on successful real Elliptic acquisition and a medium-profile run, not only
    generated tests. Preserve input hashes, validation evidence and cloud manifests.
 2. Audit the anonymous source feature definitions and availability. Build future

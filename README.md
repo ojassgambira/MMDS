@@ -12,6 +12,10 @@ generated Spark smoke data and cloud CI. No models have been trained.
 Development commands run in **Codex Cloud or GitHub-hosted CI**, never on a local Mac.
 For free browser-based data execution, see the [Google Colab guide](docs/colab.md)
 and [MMDS Cloud Pipeline notebook](notebooks/MMDS_Cloud_Pipeline.ipynb).
+Use **Runtime → Run all**: dependencies, tests, bounded acquisition, PySpark,
+chronological initial baselines, metrics, private Drive checkpoints and a report
+run through one entry point. See [verification evidence](docs/automation-verification.md)
+for what actually executed. No real-data or Colab results are implied by code.
 See [cloud setup](docs/cloud-setup.md), [architecture](docs/architecture.md),
 [data sources](docs/data-sources.md), [AMLSim feasibility](docs/amlsim-feasibility.md),
 [reproducibility](docs/reproducibility.md), [benchmarks](docs/benchmarks.md),
@@ -19,7 +23,7 @@ See [cloud setup](docs/cloud-setup.md), [architecture](docs/architecture.md),
 
 ```bash
 python -m venv .venv
-.venv/bin/python -m pip install -r requirements-dev.lock
+.venv/bin/python -m pip install -r requirements-cloud.lock
 .venv/bin/python -m pip install --no-build-isolation --no-deps -e .
 .venv/bin/python -m pytest -q
 .venv/bin/python -m ruff check .
@@ -27,7 +31,7 @@ python -m venv .venv
 ```
 
 `src/mmd_fraud/adapters` holds source boundaries, `spark` holds distributed
-operations, and `training` is reserved for Phase 2. `tests` uses only generated
+operations, and `training` holds bounded chronological Bitcoin baselines. `tests` uses only generated
 fixtures. Configurations, cloud entry points, dashboard plans and research notes
 live in `configs`, `scripts`, `dashboard` and `docs` respectively.
 
