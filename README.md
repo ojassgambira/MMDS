@@ -1,5 +1,30 @@
 # MMDS Financial Fraud Detection
 
-Scalable Multi-Domain Financial Fraud Detection Using Distributed Graph Mining, Temporal Analytics, and Machine Learning.
+Scalable Multi-Domain Financial Fraud Detection Using Distributed Graph Mining,
+Temporal Analytics, and Machine Learning.
 
-Cloud-only development using Codex, Apache Spark, and cloud ML services.
+University Mining of Massive Datasets project: distributed graph mining, temporal
+analytics, and machine learning across Bitcoin and banking domains.
+
+Phase 1 provides bounded CSV adapters, validation, a domain-aware feature contract,
+generated Spark smoke data and cloud CI. No models have been trained.
+
+All commands run in **Codex Cloud or GitHub-hosted CI**, never on a local Mac.
+See [cloud setup](docs/cloud-setup.md), [architecture](docs/architecture.md),
+[data sources](docs/data-sources.md), [AMLSim feasibility](docs/amlsim-feasibility.md),
+[reproducibility](docs/reproducibility.md), [benchmarks](docs/benchmarks.md),
+[Phase 2 plan](docs/phase2.md), and [execution results](docs/phase1-results.md).
+
+```bash
+python -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.lock
+.venv/bin/python -m pip install --no-build-isolation --no-deps -e .
+.venv/bin/python -m pytest -q
+.venv/bin/python -m ruff check .
+.venv/bin/python scripts/spark_smoke.py
+```
+
+`src/mmd_fraud/adapters` holds source boundaries, `spark` holds distributed
+operations, and `training` is reserved for Phase 2. `tests` uses only generated
+fixtures. Configurations, cloud entry points, dashboard plans and research notes
+live in `configs`, `scripts`, `dashboard` and `docs` respectively.
