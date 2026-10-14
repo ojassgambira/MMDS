@@ -15,3 +15,11 @@ Cloud checks:
 - python -m pytest -q
 - python -m ruff check .
 - PYTHONPATH=src python scripts/spark_smoke.py
+
+Phase 2 rules: acquire source files only through permitted cloud destinations.
+Keep all raw and derived data outside the checkout. Historical Spark features
+use exclusive cutoffs (step < cutoff); anonymous source aggregates are audited
+separately and must never be assumed causal. Reject conflicting duplicate IDs,
+retain banking event multiplicity, and keep descriptive graph features separate
+from historical features. Run manifests must truthfully identify generated fixtures
+and failed/blocked acquisition. No final model training in Phase 2.
