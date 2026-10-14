@@ -8,7 +8,7 @@ validates/preprocesses it in Spark, builds temporal graph predictors, trains thr
 bounded baselines, computes metrics and writes a report. No workload runs on your
 Mac or iPhone, and no paid compute or storage is provisioned.
 
-[Open the notebook](https://colab.research.google.com/github/ojassgambira/MMDS/blob/automation/run-all/notebooks/MMDS_Cloud_Pipeline.ipynb).
+[Open the notebook](https://colab.research.google.com/github/ojassgambira/MMDS/blob/fix/colab-diagnostics/notebooks/MMDS_Cloud_Pipeline.ipynb).
 After branch deletion, open the same notebook from main through Colab's GitHub tab.
 
 ## Browser instructions and unavoidable actions
@@ -169,3 +169,52 @@ manifest is published. Interrupted copies do not count as completed stages.
 Failure reports remain available in temporary storage even if Drive copying
 fails. Do not equate a passed synthetic integration test with real Elliptic access,
 Colab execution or measured real-data model quality.
+
+## Self-diagnosing failures
+
+The reported Colab Python 3.13 failure (`CalledProcessError`, exit status 1) does
+not establish its root cause. Colab runtime logs were not supplied or accessed.
+This update fixes reproducible diagnostic defects rather than claiming to solve
+an unobserved dependency, source-access, Spark or training error.
+
+The notebook catches repository setup, Drive mounting and pipeline errors in one
+place. It displays the underlying exception, failed phase and final relevant
+lines from `bootstrap.log`, `runtime.log`, `worker.log` and the active run's
+`execution.log`. Log reads are bounded, missing logs are identified, and common
+credential fields are redacted. It finishes with `pipeline_succeeded = False`
+and an explicit **FAILED** status when work stops; a completed notebook cell
+alone does not mean the pipeline succeeded. Successful runs still display their
+report. The diagnostics PR is selected automatically before merge; after that
+branch is deleted the notebook selects main, avoiding the older automation branch.
+
+`failure.json` contains an independently readable error and instruction, including
+failures before a run report exists. Preflight validates configuration types,
+source CSV paths, supported Python, Java, path separation, the real Drive mount
+and a write/read probe before installing dependencies. Python 3.11–3.13 remains
+the tested range; no package pins or version guard are weakened speculatively.
+
+Dependency/venv errors retain pip output in `bootstrap.log`. Worker tracebacks
+are written before stderr is restored, so `runtime.log` includes the actual
+exception. Startup errors and signal exits have `worker.log` as a fallback.
+Failed test commands include their check-log tail. Preprocessing, acquisition,
+training and storage errors identify their phase and preserve completed local
+checkpoints. If the first Drive copy was interrupted before publishing its
+manifest, its folder is not treated as a complete checkpoint; uncommitted copies
+can restart safely. Committed checkpoints are still hash-verified and never
+silently overwritten. Drive quota/write failures retain local evidence and
+instruct the user to check existing storage, then Run all again.
+
+An acquisition HTTP 401/403 displays one authorization/access instruction: accept
+publisher terms/authorize access through the official Kaggle release and supply
+its three CSVs privately through an `existing` configuration. This does not mean
+that PyG normally requires Kaggle credentials, nor does it diagnose every 403 as
+an authentication problem. The mirror remains the credential-free default, and
+no denied download is automatically retried or bypassed.
+
+All new failure tests use generated fixtures, mocked failures or a simulated
+notebook environment. They do not establish real Colab/Drive integration or
+real-data results. See the PR's Python 3.11–3.13 CI results for compatibility checks.
+
+A new setup or Drive authorization error takes precedence over a prior attempt's
+failure record. Logs from before worker launch are labelled as possibly historical,
+so stale output is not mistaken for the cause of the current failure.

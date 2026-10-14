@@ -13,6 +13,8 @@ import time
 from pathlib import Path
 
 from mmd_fraud.data.acquire import FILES, SOURCE, acquire, outside_repo, sha256
+from mmd_fraud.cloud_config import validate_config, validate_paths
+from mmd_fraud.diagnostics import record_failure, redact, tail
 
 
 def cloud_runtime() -> str:
@@ -110,8 +112,8 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
                  run_tests: bool = True) -> Path:
     runtime = cloud_runtime()
     repo = repo.resolve()
-    workspace = outside_repo(workspace)
-    storage = outside_repo(storage) if storage else None
+    config = validate_config(config)
+    workspace, storage = validate_paths(workspace, storage)
     source_mode = config.get("source", "pyg")
     if source_mode not in {"pyg", "existing", "generated_test_fixture"}:
         raise ValueError("unsupported source")
@@ -142,7 +144,7 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:20]
     directory = workspace / "runs" / key
     remote = storage / "runs" / key if storage else None
-    if remote and remote.exists():
+    if remote and (remote / "execution.json").is_file():
         saved = json.loads((remote / "execution.json").read_text())
         for name, stage in saved["stages"].items():
             if not verified(remote / name, stage["hashes"]):
@@ -150,6 +152,7 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
         if not directory.exists():
             shutil.copytree(remote, directory)
     directory.mkdir(parents=True, exist_ok=True)
+    (workspace / "active-run.txt").write_text(str(directory))
     state_file = directory / "execution.json"
     state = json.loads(state_file.read_text()) if state_file.exists() else {
         **identity, "runtime": runtime, "dataset_kind":
@@ -161,6 +164,7 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
     state["java_version"] = subprocess.run(
         ["java", "-version"], capture_output=True, text=True, check=True).stderr.strip()
     state["status"] = "running"
+    state["active_stage"] = "storage"
     state.pop("error", None)
     env = {**os.environ, "SPARK_LOCAL_IP": "127.0.0.1", "PYSPARK_PYTHON": sys.executable,
            "PYTHONPATH": str(repo / "src"), "OMP_NUM_THREADS": "2",
@@ -172,21 +176,36 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
         write_json(state_file, state)
         report(directory, state)
         if remote:
-            remote.mkdir(parents=True, exist_ok=True)
-            for name in state["stages"]:
-                archive(directory / name, remote / name)
-            for name in ("report.md", "execution.log", "bootstrap.log", "runtime.log"):
-                if (directory / name).exists():
-                    shutil.copy2(directory / name, remote / name)
-            # Publish state last; incomplete file copies never become completed stages.
-            write_json(remote / "execution.json", state)
+            try:
+                remote.mkdir(parents=True, exist_ok=True)
+                committed = (json.loads((remote / "execution.json").read_text())["stages"]
+                             if (remote / "execution.json").is_file() else {})
+                for name, stage_info in state["stages"].items():
+                    target = remote / name
+                    if (target.exists() and name not in committed
+                            and not verified(target, stage_info["hashes"])):
+                        # A stage copy without a published manifest was never committed.
+                        shutil.rmtree(target)
+                    archive(directory / name, target)
+                for name in ("report.md", "execution.log", "bootstrap.log", "runtime.log"):
+                    if (directory / name).exists():
+                        shutil.copy2(directory / name, remote / name)
+                write_json(remote / "execution.json", state)
+            except Exception:
+                state["active_stage"] = "storage"
+                raise
     def command(args):
         with (directory / "execution.log").open("a") as log:
             log.write(json.dumps(args) + "\n")
             log.flush()
-            subprocess.run(args, cwd=repo, env=env, stdout=log, stderr=log,
-                           check=True, timeout=1200)
+            try:
+                subprocess.run(args, cwd=repo, env=env, stdout=log, stderr=log,
+                               check=True, timeout=1200)
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+                log.flush()
+                raise RuntimeError(f"Check command failed: {args}\n{tail(directory / 'execution.log')}") from exc
     def stage(name, action):
+        state["active_stage"] = name
         if name in state["stages"]:
             if not verified(directory / name, state["stages"][name]["hashes"]):
                 raise ValueError(f"corrupt {name} checkpoint; use a fresh workspace")
@@ -218,6 +237,7 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
         else:
             state["tests"] = "skipped explicitly by caller; development integration only"
         if source_mode == "pyg":
+            state["active_stage"] = "acquisition"
             raw = workspace / "raw" / "elliptic"
             raw_remote = storage / "raw" / "elliptic" if storage else None
             if not raw.exists() and raw_remote and raw_remote.exists():
@@ -235,7 +255,9 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
                     sha256(raw / n) != records[n]["sha256"] for n in FILES):
                 raise ValueError("raw input hashes mismatch")
             if raw_remote:
+                state["active_stage"] = "storage"
                 archive(raw, raw_remote)
+                state["active_stage"] = "acquisition"
         else:
             provenance = {"source": source_mode, "files": identity["provided_inputs"]}
         hashes = {n: sha256(raw / n) for n in FILES}
@@ -298,15 +320,22 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
                   config.get("seed", 0))
         stage("models", models)
         state["status"] = "success"
+        state["active_stage"] = "complete"
         save()
+        (workspace / "failure.json").unlink(missing_ok=True)
     except Exception as exc:
         state["status"] = "failed"
-        state["error"] = f"{type(exc).__name__}: {exc}"
+        state["error"] = redact(f"{type(exc).__name__}: {exc}")
+        record_failure(workspace, exc, state["active_stage"])
         try:
             save()
-        except Exception:
+        except Exception as storage_error:
+            state["persistence_error"] = redact(f"{type(storage_error).__name__}: {storage_error}")
             write_json(state_file, state)
-            report(directory, state)
+            try:
+                report(directory, state)
+            except (OSError, ValueError, KeyError):
+                pass  # The independent failure.json remains readable even with corrupt report inputs.
         raise
     print(f"Completed report: {directory / 'report.md'}", flush=True)
     return directory
