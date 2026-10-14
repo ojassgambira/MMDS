@@ -9,7 +9,9 @@ analytics, and machine learning across Bitcoin and banking domains.
 Phase 1 provides bounded CSV adapters, validation, a domain-aware feature contract,
 generated Spark smoke data and cloud CI. No models have been trained.
 
-All commands run in **Codex Cloud or GitHub-hosted CI**, never on a local Mac.
+Development commands run in **Codex Cloud or GitHub-hosted CI**, never on a local Mac.
+For free browser-based data execution, see the [Google Colab guide](docs/colab.md)
+and [MMDS Cloud Pipeline notebook](notebooks/MMDS_Cloud_Pipeline.ipynb).
 See [cloud setup](docs/cloud-setup.md), [architecture](docs/architecture.md),
 [data sources](docs/data-sources.md), [AMLSim feasibility](docs/amlsim-feasibility.md),
 [reproducibility](docs/reproducibility.md), [benchmarks](docs/benchmarks.md),
