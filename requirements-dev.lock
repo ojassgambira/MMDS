@@ -1,0 +1,11 @@
+# Complete pinned Phase 1 dependency closure for Python 3.12.
+setuptools==80.9.0
+wheel==0.45.1
+pyspark==4.0.1
+py4j==0.10.9.9
+pytest==8.4.2
+iniconfig==2.1.0
+packaging==25.0
+pluggy==1.6.0
+Pygments==2.19.2
+ruff==0.13.3

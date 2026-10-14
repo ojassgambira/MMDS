@@ -1,0 +1,14 @@
+{
+  "accounts": "/workspace/data/banking/accounts.csv",
+  "transactions": "/workspace/data/banking/transactions.csv",
+  "columns": {
+    "account_id": "account_id",
+    "event_id": "transaction_id",
+    "source": "source_account",
+    "target": "target_account",
+    "step": "step",
+    "amount": "amount"
+  },
+  "max_rows": 100000,
+  "max_file_bytes": 50000000
+}

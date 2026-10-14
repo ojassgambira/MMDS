@@ -1,0 +1,9 @@
+{
+  "directory": "/workspace/data/elliptic",
+  "features_file": "elliptic_txs_features.csv",
+  "classes_file": "elliptic_txs_classes.csv",
+  "edges_file": "elliptic_txs_edgelist.csv",
+  "numeric_feature_count": 165,
+  "max_rows": 300000,
+  "max_file_bytes": 300000000
+}
