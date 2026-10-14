@@ -1,0 +1,160 @@
+{
+  "status": "success",
+  "domain": "bitcoin",
+  "profile": {
+    "max_rows": 10000,
+    "max_input_bytes": 50000000,
+    "partitions": 2,
+    "driver_memory": "1g",
+    "max_cutoffs": 3
+  },
+  "configuration": {
+    "directory": "/workspace/data/elliptic-fixture",
+    "missing_policy": "reject",
+    "require_original_counts": false
+  },
+  "cutoffs_exclusive": [
+    2,
+    10,
+    50
+  ],
+  "master": "local[2]",
+  "python_version": "3.12.14",
+  "spark_version": "4.0.1",
+  "git_commit": "c98b9ba2644b8de729d5056423c5a6c7f54e4a69",
+  "git_dirty": true,
+  "started_utc": "2026-10-14T13:04:59Z",
+  "inputs": [
+    {
+      "file": "elliptic_txs_features.csv",
+      "bytes": 667709,
+      "sha256": "00182d80474fd763f6bd7be71ebab34a5e9f0e1010eb31fc9f736c7023342a53"
+    },
+    {
+      "file": "elliptic_txs_classes.csv",
+      "bytes": 12905,
+      "sha256": "24cf446b88f1ce35b2238ee7e5143763809ebe45e083cad8e22edc8d785f3955"
+    },
+    {
+      "file": "elliptic_txs_edgelist.csv",
+      "bytes": 8791,
+      "sha256": "426b99791cefd2a81996032306e00d211409ec674d0ec2ff45a95956fa55dbcc"
+    }
+  ],
+  "stages": {
+    "nodes": {
+      "rows": 1000,
+      "requested_partitions": 2,
+      "read_partitions": 4,
+      "parquet_files": 98,
+      "elapsed_seconds": 3.6001035690001117
+    },
+    "edges": {
+      "rows": 999,
+      "requested_partitions": 2,
+      "read_partitions": 4,
+      "parquet_files": 98,
+      "elapsed_seconds": 2.983503153999891
+    },
+    "graph_features_descriptive": {
+      "rows": 1000,
+      "requested_partitions": 2,
+      "read_partitions": 2,
+      "parquet_files": 2,
+      "elapsed_seconds": 2.2724041209999086
+    },
+    "historical_features_2": {
+      "rows": 21,
+      "requested_partitions": 2,
+      "read_partitions": 2,
+      "parquet_files": 2,
+      "elapsed_seconds": 1.163195848000214
+    },
+    "historical_features_10": {
+      "rows": 184,
+      "requested_partitions": 2,
+      "read_partitions": 2,
+      "parquet_files": 2,
+      "elapsed_seconds": 1.2995859039999687
+    },
+    "historical_features_50": {
+      "rows": 1000,
+      "requested_partitions": 2,
+      "read_partitions": 2,
+      "parquet_files": 2,
+      "elapsed_seconds": 2.4927260350000324
+    }
+  },
+  "elapsed_seconds": 33.63903204200005,
+  "python_peak_rss_bytes": 32276480,
+  "cgroup_current_memory_bytes": 1802903552,
+  "cgroup_peak_memory_bytes": 2579816448,
+  "validation": {
+    "feature_rows_raw": 1000,
+    "missing_numeric_values": 0,
+    "feature_duplicates_removed": 0,
+    "class_rows_raw": 1000,
+    "class_duplicates_removed": 0,
+    "edge_rows_raw": 999,
+    "edge_duplicates_removed": 0,
+    "nodes": 1000,
+    "edges": 999,
+    "labels": {
+      "unknown": 1000
+    },
+    "steps": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49
+    ]
+  },
+  "validation_seconds": 15.074883625999973,
+  "dataset_kind": "generated_test_fixture",
+  "annotation": "Origin annotation added when exporting evidence; original run manifest predates dataset_kind field."
+}

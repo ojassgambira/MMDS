@@ -1,0 +1,6 @@
+{
+  "directory": "/workspace/data/elliptic",
+  "missing_policy": "reject",
+  "require_original_counts": true,
+  "dataset_kind": "original_elliptic_release"
+}

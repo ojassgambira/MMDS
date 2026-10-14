@@ -1,0 +1,6 @@
+{
+  "directory": "/workspace/data/elliptic-fixture",
+  "missing_policy": "reject",
+  "require_original_counts": false,
+  "dataset_kind": "generated_test_fixture"
+}

@@ -1,0 +1,16 @@
+{
+  "accounts": "/workspace/data/banking/accounts.csv",
+  "transactions": "/workspace/data/banking/transactions.csv",
+  "columns": {
+    "account_id": "acct_id",
+    "event_id": "tran_id",
+    "source": "orig_acct",
+    "target": "bene_acct",
+    "step": "tran_timestamp",
+    "amount": "base_amt"
+  },
+  "time_unit": "days_from_base_utc",
+  "timestamp_format": "yyyy-MM-dd'T'HH:mm:ss'Z'",
+  "base_date": "2017-01-01T00:00:00+00:00",
+  "step_seconds": 86400
+}
