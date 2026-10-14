@@ -1,7 +1,7 @@
 # Development rules
 All development, Python, Java, Spark, tests, data processing, training and deployment
-must run in Codex Cloud or GitHub-hosted CI. Never require workloads on the user's Mac.
-Use Python 3.12 and Spark 4.0.1 with Java 17 or 21. Keep pinned requirements compatible.
+must run in Codex Cloud, Google Colab or GitHub-hosted CI. Never require workloads on the user's Mac.
+Use tested Python 3.11–3.13 and Spark 4.0.1 with Java 17 or 21. Keep pinned requirements compatible.
 Keep Bitcoin transaction nodes distinct from banking account nodes. Preserve edge
 multiplicity and domain-specific time units. Unknown labels are not negatives.
 Keep Spark transformations under src/mmd_fraud/spark and training under training.
@@ -23,3 +23,6 @@ separately and must never be assumed causal. Reject conflicting duplicate IDs,
 retain banking event multiplicity, and keep descriptive graph features separate
 from historical features. Run manifests must truthfully identify generated fixtures
 and failed/blocked acquisition. No final model training in Phase 2.
+The automated Phase 3 workflow permits only the requested bounded initial baselines,
+with chronological evaluation and explicit end-of-step feature availability.
+Do not retry dataset acquisition in Codex Cloud; use Colab or authorized existing CSVs.

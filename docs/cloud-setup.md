@@ -1,5 +1,10 @@
 # Cloud setup
 
+For the current automated workflow use [the Colab/cloud guide](colab.md) and
+`requirements-cloud.lock`, which includes development and initial baseline
+dependencies. Python 3.11–3.13 compatibility is covered by the current CI matrix.
+The historical Phase 1 environment notes below describe its original setup.
+
 Use the GitHub repository ojassgambira/MMDS in Codex Cloud. The Mac is only a UI
 for reviewing changes and managing cloud access; it runs no project workloads.
 The inspected cloud runtime has Python 3.12.14 and OpenJDK JRE 21.0.12.1.

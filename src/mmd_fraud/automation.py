@@ -1,0 +1,312 @@
+"""Cloud-only bounded acquisition → Spark → baselines → resumable evidence."""
+import hashlib
+import importlib.metadata
+import importlib.util
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+from mmd_fraud.data.acquire import FILES, SOURCE, acquire, outside_repo, sha256
+
+
+def cloud_runtime() -> str:
+    if Path("/etc/codex/network-policy.json").is_file():
+        return "codex_cloud"
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        return "github_ci"
+    if Path("/content").is_dir() and os.environ.get("MMDS_COLAB_RUNTIME") == "1":
+        return "colab"
+    raise RuntimeError("Execute only in Codex Cloud, Google Colab or GitHub CI; no device workloads")
+
+
+def write_json(path: Path, value: dict) -> None:
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n")
+    temporary.replace(path)
+
+
+def inventory(directory: Path) -> dict:
+    return {str(p.relative_to(directory)): sha256(p)
+            for p in sorted(directory.rglob("*")) if p.is_file()}
+
+
+def verified(directory: Path, hashes: dict) -> bool:
+    return directory.is_dir() and inventory(directory) == hashes and bool(hashes)
+
+
+def archive(source: Path, destination: Path) -> None:
+    """Publish verified immutable snapshots; a partial copy never counts as complete."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    hashes = inventory(source)
+    if destination.exists():
+        if not verified(destination, hashes):
+            raise ValueError("existing cloud checkpoint differs; refusing overwrite")
+        return
+    with tempfile.TemporaryDirectory(dir=destination.parent, prefix="mmds-copy-") as temp:
+        stage = Path(temp) / "payload"
+        shutil.copytree(source, stage)
+        if not verified(stage, hashes):
+            raise ValueError("cloud checkpoint copy hash mismatch")
+        stage.rename(destination)
+
+
+def report(directory: Path, state: dict) -> None:
+    lines = ["# MMDS cloud execution report", "", f"Status: **{state['status']}**",
+             f"Dataset kind: `{state['dataset_kind']}`", f"Runtime: `{state['runtime']}`",
+             f"Code commit: `{state['git_commit']}`", "",
+             "This is a measured run, not a claim of Colab verification from another runtime.",
+             "No anonymous source features or labels enter graph predictors. Unknown labels",
+             "are excluded from supervised fitting and evaluation. Features are available",
+             "after each source step completes; same-step information is included. The label",
+             "availability assumption is offline; live availability is unverified.", "",
+             "## Stages", "", "| Stage | Seconds | Checkpoint |",
+             "| --- | ---: | --- |"]
+    for name, stage in state["stages"].items():
+        lines.append(f"| {name} | {stage['seconds']:.3f} | hash-verified |")
+    if state.get("provenance"):
+        lines += ["", f"Source: `{state['provenance']['source']}`."]
+        if "elapsed_seconds" in state["provenance"]:
+            lines.append(f"Original acquisition seconds: {state['provenance']['elapsed_seconds']:.3f} "
+                         "(cached acquisitions are not repeated).")
+    if (directory / "preprocess/run.json").exists():
+        run = json.loads((directory / "preprocess/run.json").read_text())
+        lines += ["", "## Data validation", "", "```json",
+                  json.dumps(run.get("validation", {}), indent=2), "```"]
+    if (directory / "models/metrics.json").exists():
+        metrics = json.loads((directory / "models/metrics.json").read_text())
+        lines += ["", "## Baseline evaluation", "",
+                  f"Train steps 1–{metrics['train_end']}; validation "
+                  f"{metrics['train_end'] + 1}–{metrics['validation_end']}; test "
+                  f"{metrics['validation_end'] + 1}–49.",
+                  f"Unknown labels excluded: {metrics['unknown_excluded']}.",
+                  f"Selected on validation average precision: `{metrics['selected_model']}`.",
+                  "Threshold fixed at 0.5; PR-AUC is average precision (not trapezoidal area).",
+                  "Confusion matrices use rows=true, columns=predicted, order [licit, illicit].",
+                  "", "| Model | Period | Precision | Recall | F1 | PR-AUC (AP) | Matrix |",
+                  "| --- | --- | ---: | ---: | ---: | ---: | --- |"]
+        for name, periods in metrics["models"].items():
+            for period, m in periods.items():
+                lines.append(f"| {name} | {period} | {m['precision']:.4f} | {m['recall']:.4f} "
+                             f"| {m['f1']:.4f} | {m['pr_auc_average_precision']:.4f} "
+                             f"| {m['confusion_matrix']} |")
+        lines += ["", "### Split counts", "", "```json",
+                  json.dumps(metrics["split_counts"], indent=2), "```"]
+    if state.get("error"):
+        lines += ["", "## Failure", "", state["error"]]
+    lines += ["", "## Limits", "", "Small samples are induced subgraphs, not population estimates.",
+              "Free CPU timing is not multi-machine speedup. Dataset/model artifacts stay private.",
+              "Logs: `execution.log`; versions/configuration/checkpoint hashes: `execution.json`.",
+              "A completed checkpoint resumes only with matching code, configuration and inputs."]
+    (directory / "report.md").write_text("\n".join(lines) + "\n")
+
+
+def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None = None,
+                 run_tests: bool = True) -> Path:
+    runtime = cloud_runtime()
+    repo = repo.resolve()
+    workspace = outside_repo(workspace)
+    storage = outside_repo(storage) if storage else None
+    source_mode = config.get("source", "pyg")
+    if source_mode not in {"pyg", "existing", "generated_test_fixture"}:
+        raise ValueError("unsupported source")
+    if config.get("data_mode", "full") not in {"full", "sample"}:
+        raise ValueError("unsupported data mode")
+    if config.get("master", "local[2]") != "local[2]":
+        raise ValueError("initial baselines are limited to two cloud CPU workers")
+    train_end, validation_end = config.get("train_end", 34), config.get("validation_end", 39)
+    if not (isinstance(train_end, int) and isinstance(validation_end, int)
+            and 1 <= train_end < validation_end < 49):
+        raise ValueError("invalid chronological split boundaries")
+    workspace.mkdir(parents=True, exist_ok=True)
+    dependencies = {d.metadata["Name"]: d.version for d in importlib.metadata.distributions()}
+    identity = {"config": config, "git_commit": subprocess.check_output(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip(),
+        "git_dirty": bool(subprocess.check_output(
+            ["git", "-C", str(repo), "status", "--porcelain"], text=True).strip()),
+        "python": platform.python_version(), "dependencies": dependencies}
+    # Dirty development trees also need a code fingerprint to prevent stale resumption.
+    code = [p for folder in ("src", "scripts", "tests", "configs")
+            for p in (repo / folder).rglob("*") if p.suffix in {".py", ".json"}]
+    identity["code_hashes"] = {str(p.relative_to(repo)): sha256(p) for p in sorted(code)}
+    if source_mode != "pyg":
+        raw = outside_repo(Path(config["input_directory"]))
+        if sum((raw / n).stat().st_size for n in FILES) > 500000000:
+            raise ValueError("provided source exceeds 500 MB budget")
+        identity["provided_inputs"] = {n: sha256(raw / n) for n in FILES}
+    key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:20]
+    directory = workspace / "runs" / key
+    remote = storage / "runs" / key if storage else None
+    if remote and remote.exists():
+        saved = json.loads((remote / "execution.json").read_text())
+        for name, stage in saved["stages"].items():
+            if not verified(remote / name, stage["hashes"]):
+                raise ValueError("corrupt stored checkpoint")
+        if not directory.exists():
+            shutil.copytree(remote, directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    state_file = directory / "execution.json"
+    state = json.loads(state_file.read_text()) if state_file.exists() else {
+        **identity, "runtime": runtime, "dataset_kind":
+        "generated_test_fixture" if source_mode == "generated_test_fixture" else
+        "real_elliptic_induced_sample" if config.get("data_mode") == "sample" else
+        "original_elliptic_release", "stages": {}, "status": "running"}
+    state["runtime"] = runtime
+    state.setdefault("started_utc", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    state["java_version"] = subprocess.run(
+        ["java", "-version"], capture_output=True, text=True, check=True).stderr.strip()
+    state["status"] = "running"
+    state.pop("error", None)
+    env = {**os.environ, "SPARK_LOCAL_IP": "127.0.0.1", "PYSPARK_PYTHON": sys.executable,
+           "PYTHONPATH": str(repo / "src"), "OMP_NUM_THREADS": "2",
+           "OPENBLAS_NUM_THREADS": "2"}
+    def save():
+        for name in ("bootstrap.log", "runtime.log"):
+            if (workspace / name).exists():
+                shutil.copy2(workspace / name, directory / name)
+        write_json(state_file, state)
+        report(directory, state)
+        if remote:
+            remote.mkdir(parents=True, exist_ok=True)
+            for name in state["stages"]:
+                archive(directory / name, remote / name)
+            for name in ("report.md", "execution.log", "bootstrap.log", "runtime.log"):
+                if (directory / name).exists():
+                    shutil.copy2(directory / name, remote / name)
+            # Publish state last; incomplete file copies never become completed stages.
+            write_json(remote / "execution.json", state)
+    def command(args):
+        with (directory / "execution.log").open("a") as log:
+            log.write(json.dumps(args) + "\n")
+            log.flush()
+            subprocess.run(args, cwd=repo, env=env, stdout=log, stderr=log,
+                           check=True, timeout=1200)
+    def stage(name, action):
+        if name in state["stages"]:
+            if not verified(directory / name, state["stages"][name]["hashes"]):
+                raise ValueError(f"corrupt {name} checkpoint; use a fresh workspace")
+            print(f"Reusing verified checkpoint: {name}", flush=True)
+            return
+        target = directory / name
+        if target.exists():
+            # Only incomplete stage directories inside this generated run are replaceable.
+            shutil.rmtree(target)
+        print(f"Running stage: {name}", flush=True)
+        began = time.monotonic()
+        action(target)
+        state["stages"][name] = {"seconds": time.monotonic() - began,
+                                 "hashes": inventory(target)}
+        save()
+    try:
+        save()
+        if run_tests:
+            state.pop("tests", None)
+            def checks(target):
+                target.mkdir()
+                for args in ([sys.executable, "-m", "ruff", "check", "."],
+                             [sys.executable, "-m", "pytest", "-q"],
+                             [sys.executable, "scripts/spark_smoke.py"]):
+                    command(args)
+                write_json(target / "checks.json", {"status": "passed",
+                           "commands": ["ruff check .", "pytest -q", "spark_smoke.py"]})
+            stage("checks", checks)
+        else:
+            state["tests"] = "skipped explicitly by caller; development integration only"
+        if source_mode == "pyg":
+            raw = workspace / "raw" / "elliptic"
+            raw_remote = storage / "raw" / "elliptic" if storage else None
+            if not raw.exists() and raw_remote and raw_remote.exists():
+                shutil.copytree(raw_remote, raw)
+            if not raw.exists():
+                if runtime == "codex_cloud":
+                    raise RuntimeError("Dataset downloads from Codex Cloud are disabled. "
+                                       "Run the same workflow in Colab, or provide authorized CSVs.")
+                acquire(raw)
+            provenance = json.loads((raw / "acquisition.json").read_text())
+            if provenance.get("source") != SOURCE:
+                raise ValueError("unexpected source provenance")
+            records = {r["file"]: r for r in provenance["files"]}
+            if set(records) != set(FILES) or any(
+                    sha256(raw / n) != records[n]["sha256"] for n in FILES):
+                raise ValueError("raw input hashes mismatch")
+            if raw_remote:
+                archive(raw, raw_remote)
+        else:
+            provenance = {"source": source_mode, "files": identity["provided_inputs"]}
+        hashes = {n: sha256(raw / n) for n in FILES}
+        if "raw_hashes" in state and state["raw_hashes"] != hashes:
+            raise ValueError("input changed since checkpoint; use a fresh workspace")
+        state["raw_hashes"] = hashes
+        state["provenance"] = provenance
+        save()
+        input_dir = raw
+        if config.get("data_mode") == "sample":
+            from mmd_fraud.data.sample import sample_elliptic
+            stage("sample", lambda target: sample_elliptic(
+                raw, target, per_step=config.get("sample_per_step", 200)))
+            audit = json.loads((directory / "sample/sample.json").read_text())
+            if source_mode != "generated_test_fixture" and (
+                    audit["source_nodes"] != 203769 or audit["source_edges_raw"] != 234355
+                    or audit["source_labels"] != {"1": 4545, "2": 42019, "unknown": 157205}
+                    or audit["source_steps"] != list(range(1, 50))):
+                raise ValueError("source release count/label/time audit failed")
+            input_dir = directory / "sample"
+        profile_name = "small" if config.get("data_mode") == "sample" else "medium"
+        profile = json.loads((repo / "configs/profiles.json").read_text())[profile_name]
+        def preprocess(target):
+            from mmd_fraud.spark.pipeline import run
+            # Existing pipeline preserves source arrays for audit, never model predictors.
+            current = Path.cwd()
+            try:
+                os.chdir(repo)
+                run({"directory": str(input_dir), "dataset_kind": state["dataset_kind"],
+                     "require_original_counts": source_mode != "generated_test_fixture"
+                     and config.get("data_mode") != "sample"}, profile, target, cutoffs=())
+            finally:
+                os.chdir(current)
+        stage("preprocess", preprocess)
+        def causal(target):
+            from mmd_fraud.spark.pipeline import session
+            from mmd_fraud.spark.causal import end_of_step_features
+            from pyspark.sql import functions as F
+            target.mkdir()
+            spark = session(profile, directory / "spark-checkpoints")
+            try:
+                nodes = spark.read.parquet(str(directory / "preprocess/nodes"))
+                edges = spark.read.parquet(str(directory / "preprocess/edges"))
+                features = end_of_step_features(nodes, edges)
+                features.write.mode("errorifexists").parquet(str(target / "transactions"))
+                checked = spark.read.parquet(str(target / "transactions"))
+                count = checked.count()
+                if count != nodes.count() or checked.select("entity_id").distinct().count() != count:
+                    raise ValueError("causal features changed transaction identities")
+                if checked.filter(F.col("feature_cutoff_exclusive") != F.col("time_step") + 1).count():
+                    raise ValueError("invalid feature temporal boundary")
+                write_json(target / "validation.json", {"rows": count, "schema": "end_step_v1"})
+            finally:
+                spark.stop()
+        stage("causal", causal)
+        def models(target):
+            from mmd_fraud.training.baselines import train
+            train(directory / "causal/transactions", target,
+                  config.get("train_end", 34), config.get("validation_end", 39),
+                  config.get("seed", 0))
+        stage("models", models)
+        state["status"] = "success"
+        save()
+    except Exception as exc:
+        state["status"] = "failed"
+        state["error"] = f"{type(exc).__name__}: {exc}"
+        try:
+            save()
+        except Exception:
+            write_json(state_file, state)
+            report(directory, state)
+        raise
+    print(f"Completed report: {directory / 'report.md'}", flush=True)
+    return directory

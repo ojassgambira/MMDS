@@ -1,4 +1,4 @@
-# Complete pinned Phase 1 dependency closure for Python 3.12.
+# Pinned development closure; cloud CI covers Python 3.11–3.13.
 setuptools==80.9.0
 wheel==0.45.1
 pyspark==4.0.1

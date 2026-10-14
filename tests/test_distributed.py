@@ -9,6 +9,7 @@ from mmd_fraud.adapters.elliptic import EllipticConfig
 from mmd_fraud.adapters.banking import BankingColumns
 from mmd_fraud.spark.preprocess import elliptic, banking
 from mmd_fraud.spark.graph import statistics, historical
+from mmd_fraud.spark.causal import end_of_step_features
 from mmd_fraud.spark.pipeline import session, run
 from mmd_fraud.validation import ValidationError
 
@@ -68,6 +69,22 @@ class DistributedTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             historical(nodes, edges, 0)
         self.assertEqual(historical(nodes, edges, 1).count(), 0)
+
+    def test_end_step_features_exclude_future_edges_and_source_values(self):
+        nodes, edges, _ = self.load()
+        original = {r.entity_id: r.asDict() for r in end_of_step_features(nodes, edges).collect()}
+        self.assertEqual(original['2']['out_degree'], 0)  # Edge 2→3 is in step 2.
+        self.assertEqual(original['2']['in_degree'], 1)  # Edge 1→2 is available in step 1.
+        self.assertEqual(original['3']['past_neighbor_count'], 1)
+        self.assertEqual(original['3']['feature_cutoff_exclusive'], 3)
+        self.assertNotIn('source_features', original['3'])
+        future = edges.unionByName(self.spark.createDataFrame(
+            [('4', '1', 3, 1, 3)], 'source string,target string,source_step int,'
+                                  'target_step int,available_step int'))
+        changed = {r.entity_id: r.asDict() for r in end_of_step_features(nodes, future).collect()}
+        self.assertEqual(original['1'], changed['1'])
+        self.assertEqual(original['2'], changed['2'])
+        self.assertEqual(original['3'], changed['3'])
 
     def test_duplicates_missing_and_schema(self):
         with (self.input / 'elliptic_txs_features.csv').open('a') as handle:
