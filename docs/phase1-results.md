@@ -2,8 +2,9 @@
 
 Executed on 2026-10-14 in Codex Cloud, /workspace/MMDS. No workload ran on a Mac.
 The initial checkout had no tracked files or local commits; its origin was
-https://github.com/ojassgambira/MMDS.git. Remote main was subsequently fetched
-before basing the foundation branch on it. Python 3.12.14 and Java JRE 21.0.12.1
+https://github.com/ojassgambira/MMDS.git. Remote main contained a short README. The first fetch populated FETCH_HEAD only;
+an explicit remote-tracking ref fetch and a merge connected the foundation to
+main history, preserving the original project title and resolving the README conflict. Python 3.12.14 and Java JRE 21.0.12.1
 were present; javac, Maven, PySpark, pytest and ruff were initially absent.
 
 ## Commands and actual outcomes

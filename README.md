@@ -1,4 +1,7 @@
-# Scalable Multi-Domain Financial Fraud Detection
+# MMDS Financial Fraud Detection
+
+Scalable Multi-Domain Financial Fraud Detection Using Distributed Graph Mining,
+Temporal Analytics, and Machine Learning.
 
 University Mining of Massive Datasets project: distributed graph mining, temporal
 analytics, and machine learning across Bitcoin and banking domains.
