@@ -1,5 +1,6 @@
 """Bounded offline Bitcoin baselines; labels/anonymous aggregates are not inputs."""
 import json
+import time
 from pathlib import Path
 
 import joblib
@@ -43,13 +44,21 @@ def chronological_split(records: list[dict], train_end: int, validation_end: int
 
 
 def evaluate(y: np.ndarray, probabilities: np.ndarray) -> dict:
+    y, probabilities = np.asarray(y), np.asarray(probabilities)
+    if (y.ndim != 1 or probabilities.shape != y.shape or set(y.tolist()) != {0, 1}
+            or not np.isfinite(probabilities).all()
+            or ((probabilities < 0) | (probabilities > 1)).any()):
+        raise ValueError("metrics require both binary classes and finite probabilities in [0, 1]")
     prediction = (probabilities >= 0.5).astype(int)
+    matrix = confusion_matrix(y, prediction, labels=[0, 1])
+    tn, fp, fn, tp = matrix.ravel()
     return {
         "precision": float(precision_score(y, prediction, zero_division=0)),
         "recall": float(recall_score(y, prediction, zero_division=0)),
         "f1": float(f1_score(y, prediction, zero_division=0)),
         "pr_auc_average_precision": float(average_precision_score(y, probabilities)),
-        "confusion_matrix": confusion_matrix(y, prediction, labels=[0, 1]).tolist(),
+        "false_positive_rate": float(fp / (fp + tn)),
+        "confusion_matrix": matrix.tolist(),
         "confusion_matrix_order": ["licit=0", "illicit=1"],
         "rows": len(y), "illicit": int(y.sum()), "threshold": 0.5,
     }
@@ -62,6 +71,8 @@ def train(feature_path: Path, output: Path, train_end: int = 34,
         raise ValueError("training table exceeds bounded original-release size")
     records = dataset.read(columns=["entity_id", "time_step", "label",
                                     "feature_cutoff_exclusive", *FEATURES]).to_pylist()
+    # Spark/Parquet partition enumeration is not a reproducible training row order.
+    records.sort(key=lambda r: (r["time_step"], r["entity_id"]))
     splits = chronological_split(records, train_end, validation_end)
     arrays = {}
     for name, rows in splits["groups"].items():
@@ -84,15 +95,31 @@ def train(feature_path: Path, output: Path, train_end: int = 34,
         "validation_end": validation_end, "unknown_excluded": splits["unknown_excluded"],
         "task": "retrospective transaction classification after source step completes",
         "label_availability_assumption": "offline train labels known before validation; not verified live",
+        "row_order": "time_step then entity_id (lexicographic)",
+        "training_seconds": {},
+        "model_configuration": {"prior": {"strategy": "prior"},
+                                "logistic_regression": {"class_weight": "balanced", "max_iter": 1000},
+                                "random_forest": {"n_estimators": 64, "max_depth": 8,
+                                                  "min_samples_leaf": 3, "class_weight": "balanced",
+                                                  "fit_jobs": 2, "inference_jobs": 1}},
         "split_counts": {k: {"rows": len(y), "illicit": int(y.sum())}
                          for k, (_, y) in arrays.items()}, "models": {},
     }
     for name, model in models.items():
+        began = time.monotonic()
         model.fit(*arrays["train"])
+        result["training_seconds"][name] = time.monotonic() - began
+        if isinstance(model, RandomForestClassifier):
+            # Sequential tree accumulation avoids scheduling-dependent score tie ordering.
+            model.n_jobs = 1
         x, y = arrays["validation"]
         score = model.predict_proba(x)[:, list(model.classes_).index(1)]
         result["models"][name] = {"validation": evaluate(y, score)}
-        joblib.dump(model, output / f"{name}.joblib")
+        path = output / f"{name}.joblib"
+        joblib.dump(model, path)
+        restored = joblib.load(path)  # Only the model just written by this process is trusted.
+        if not np.allclose(restored.predict_proba(x), model.predict_proba(x), rtol=1e-12, atol=1e-15):
+            raise ValueError("model serialization probability round-trip failed")
     # Choose before any test evaluation; no threshold/hyperparameter search on test.
     result["selected_model"] = max(
         ("logistic_regression", "random_forest"),
