@@ -12,7 +12,8 @@ generated Spark smoke data and cloud CI. Generated-fixture models are used only 
 Development commands run in **Codex Cloud or GitHub-hosted CI**, never on a local Mac.
 For unattended real-data training, see [GitHub cloud execution](docs/unattended-training.md).
 Pull requests/pushes run it automatically; after merge a weekly schedule and a manual
-Actions selector are available. Public artifacts contain aggregate results only.
+Actions selector are available. Public artifacts contain aggregate results only. The [feature-family comparison](docs/feature-comparison.md)
+adds bounded tuning of transaction, graph, temporal and combined models.
 For optional free browser-based data execution, see the [Google Colab guide](docs/colab.md)
 and [MMDS Cloud Pipeline notebook](notebooks/MMDS_Cloud_Pipeline.ipynb).
 Use **Runtime → Run all**: dependencies, tests, bounded acquisition, PySpark,

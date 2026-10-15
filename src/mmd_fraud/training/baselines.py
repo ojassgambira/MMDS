@@ -43,13 +43,15 @@ def chronological_split(records: list[dict], train_end: int, validation_end: int
     return {"groups": groups, "unknown_excluded": unknown}
 
 
-def evaluate(y: np.ndarray, probabilities: np.ndarray) -> dict:
+def evaluate(y: np.ndarray, probabilities: np.ndarray, threshold: float = 0.5) -> dict:
     y, probabilities = np.asarray(y), np.asarray(probabilities)
     if (y.ndim != 1 or probabilities.shape != y.shape or set(y.tolist()) != {0, 1}
             or not np.isfinite(probabilities).all()
             or ((probabilities < 0) | (probabilities > 1)).any()):
         raise ValueError("metrics require both binary classes and finite probabilities in [0, 1]")
-    prediction = (probabilities >= 0.5).astype(int)
+    if not np.isfinite(threshold) or not 0 <= threshold <= np.nextafter(1., 2.):
+        raise ValueError("invalid decision threshold")
+    prediction = (probabilities >= threshold).astype(int)
     matrix = confusion_matrix(y, prediction, labels=[0, 1])
     tn, fp, fn, tp = matrix.ravel()
     return {
@@ -60,7 +62,7 @@ def evaluate(y: np.ndarray, probabilities: np.ndarray) -> dict:
         "false_positive_rate": float(fp / (fp + tn)),
         "confusion_matrix": matrix.tolist(),
         "confusion_matrix_order": ["licit=0", "illicit=1"],
-        "rows": len(y), "illicit": int(y.sum()), "threshold": 0.5,
+        "rows": len(y), "illicit": int(y.sum()), "threshold": float(threshold),
     }
 
 

@@ -116,7 +116,7 @@ class AutomationTests(unittest.TestCase):
             raw = root / "generated"
             generated_source(raw)
             config = {"source": "generated_test_fixture", "input_directory": str(raw),
-                      "data_mode": "full", "train_end": 34, "validation_end": 39}
+                      "data_mode": "full", "train_end": 34, "validation_end": 39, "experiments": True}
             repo = Path(__file__).resolve().parents[1]
             with patch("mmd_fraud.automation.archive", side_effect=OSError("Drive quota exhausted")):
                 with self.assertRaisesRegex(OSError, "Drive quota exhausted"):
@@ -143,6 +143,10 @@ class AutomationTests(unittest.TestCase):
                 evidence.mkdir(parents=True, exist_ok=True)
                 for name in ("report.md", "execution.json"):
                     shutil.copy2(output / name, evidence / f"generated-{name}")
+            comparison = json.loads((output / "comparison/comparison.json").read_text())
+            self.assertEqual(set(comparison["families"]),
+                             {"transaction_only", "graph_only", "temporal", "combined"})
+            self.assertEqual(comparison["unknown_excluded"], 49)
             model_hashes = inventory(output / "models")
             shutil.rmtree(root / "workspace")
             restored = run_workflow(repo, root / "workspace", config,
