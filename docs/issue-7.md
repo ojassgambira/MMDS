@@ -90,6 +90,20 @@ required checks; this work does not merge the PR.
 
 ## Execution evidence
 
-Verification results and CI URLs are recorded here after execution. Metadata
-inspection above is verified; real Colab execution and real model metrics remain
-unverified and are not claimed.
+Codex Cloud Python 3.12 verification: full pytest pass (70 tests, 236.42 seconds),
+three targeted checks after additions (passed), then complete unittest discovery
+**72 tests passed in 198.075 seconds**. Ruff, installed-environment pip check,
+diff whitespace check and actionlint 1.7.7 passed. Standalone Spark smoke returned
+`{"cutoff_step": 2, "records": 4, "source_accounts": 2}`. The actual isolated
+bootstrap regression installed the pins without ensurepip, verified child imports
+and pip check, and skipped reinstalls on its second preparation.
+
+Generated E2E measured 196 nodes/195 edges; preprocessing 50.003 seconds, temporal
+features 6.278 seconds, models 0.468 seconds in the first pytest run. Simulated
+quota/training failures, completed-stage reuse, remote restoration and corruption
+rejection passed. Timings describe a generated fixture, not real model performance.
+
+Committed-source GitHub checks and real-release evidence are tracked in
+[PR #8](https://github.com/ojassgambira/MMDS/pull/8). Metadata inspection above is
+verified; real Colab execution and real model metrics remain unverified and are
+not claimed.

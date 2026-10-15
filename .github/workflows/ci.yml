@@ -22,7 +22,6 @@ jobs:
       PYSPARK_PYTHON: python
       OMP_NUM_THREADS: '2'
       OPENBLAS_NUM_THREADS: '2'
-      MMDS_TEST_REPORT_DIRECTORY: ${{ runner.temp }}/mmds-evidence
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,7 +36,9 @@ jobs:
       - run: python -m pip install --no-build-isolation --no-deps -e .
       - run: python -m pip check
       - run: python -m ruff check .
-      - run: |
+      - env:
+          MMDS_TEST_REPORT_DIRECTORY: ${{ runner.temp }}/mmds-evidence
+        run: |
           mkdir -p "$RUNNER_TEMP/mmds-evidence"
           set -o pipefail
           python -m pytest -q 2>&1 | tee "$RUNNER_TEMP/mmds-evidence/pytest.log"
