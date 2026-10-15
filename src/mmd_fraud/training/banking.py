@@ -55,12 +55,28 @@ def anomaly(feature_path: Path, output: Path):
     return result
 
 
+def sar_vocabulary(value):
+    """Translate shared backend class names without relabeling the real Elliptic reference."""
+    if isinstance(value, dict):
+        return {
+            ("sar_positive" if k == "illicit" else k): sar_vocabulary(v) for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [sar_vocabulary(v) for v in value]
+    if value == "licit=0":
+        return "no_simulated_sar_involvement=0"
+    if value == "illicit=1":
+        return "simulated_sar_involvement=1"
+    return value
+
+
 def report(runs, reference, public: Path):
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    runs = sar_vocabulary(runs)
     public.mkdir()
     kind = runs[0]["provenance"]["dataset_kind"]
     title = (
@@ -70,7 +86,7 @@ def report(runs, reference, public: Path):
     )
     summary = {
         "dataset_kind": kind,
-        "official_amlsim_output": False,
+        "official_amlsim_output": runs[0]["provenance"]["official_amlsim_output"],
         "real_banking_fraud_verified": False,
         "runs": runs,
         "elliptic_reference": reference,
@@ -206,7 +222,7 @@ def report(runs, reference, public: Path):
         ax.barh(
             names,
             means,
-            xerr=np.array([means - values.min(axis=0), values.max(axis=0) - means]),
+            xerr=np.maximum(np.array([means - values.min(axis=0), values.max(axis=0) - means]), 0),
             color="#367d72",
         )
         ax.set_title(metric.replace("_", " "))

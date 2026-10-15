@@ -85,6 +85,13 @@ class BankingTests(unittest.TestCase):
             self.assertEqual(run["validation"]["account_days"], 2450)
             self.assertEqual(len(run["comparison"]["families"]), 4)
             self.assertEqual(run["comparison"]["cutoff_offset"], 0)
+            self.assertIn("sar_positive", run["comparison"]["split_counts"]["test"])
+            self.assertNotIn("illicit", json.dumps(run["comparison"]))
+            self.assertIn("python", summary["identity"])
+            self.assertEqual(
+                summary["elliptic_reference"]["baseline"]["confusion_matrix_order"],
+                ["licit=0", "illicit=1"],
+            )
             self.assertEqual(
                 set(p.name for p in output.iterdir()),
                 {

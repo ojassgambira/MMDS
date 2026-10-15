@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -48,6 +49,7 @@ def execute(workspace: Path, config: dict, input_directory=None):
     identity = {
         "config": config,
         "runtime": runtime,
+        "python": platform.python_version(),
         "git_commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=repo, text=True
         ).strip(),
@@ -130,7 +132,7 @@ def execute(workspace: Path, config: dict, input_directory=None):
                     target / "provenance.json",
                     {
                         "dataset_kind": "external_amlsim_compatible_unverified",
-                        "official_amlsim_output": False,
+                        "official_amlsim_output": None,
                         "real_data_verified": False,
                         "files": {
                             n: sha256(target / n) for n in ("accounts.csv", "transactions.csv")
