@@ -12,6 +12,7 @@ class Response(io.BytesIO):
     def __init__(self, payload, url):
         super().__init__(payload)
         self.url = url
+        self.headers = {}
 
 
 class AcquisitionTests(unittest.TestCase):

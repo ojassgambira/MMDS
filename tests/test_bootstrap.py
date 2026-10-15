@@ -51,11 +51,11 @@ class BootstrapTests(unittest.TestCase):
             partial.mkdir()
             (partial / 'pyvenv.cfg').write_text('incomplete earlier attempt')
             with patch('mmd_fraud.bootstrap.is_colab', return_value=True), \
-                    patch.object(bootstrap.venv, 'create', side_effect=ModuleNotFoundError('ensurepip')) as create, \
+                    patch.object(bootstrap.venv, 'create') as create, \
                     patch.object(bootstrap.importlib.util, 'find_spec', return_value=None):
                 python = bootstrap.select_python(root, io.StringIO())
-            self.assertEqual(str(python), sys.executable)
-            create.assert_not_called()
+            self.assertEqual(python, root / f'colab-venv-{sys.version_info.major}.{sys.version_info.minor}/bin/python')
+            create.assert_called_once_with(python.parent.parent, with_pip=False)
             self.assertTrue(partial.exists())
 
     def test_broken_cloud_venv_is_rebuilt_without_touching_checkpoints(self):
@@ -113,6 +113,7 @@ class BootstrapTests(unittest.TestCase):
                     return subprocess.CompletedProcess(args, 0, json.dumps({'missing': {}, 'editable': True}))
                 return subprocess.CompletedProcess(args, 0)
             with patch('mmd_fraud.bootstrap.is_colab', return_value=True), \
+                    patch.object(bootstrap, 'select_python', return_value=Path(sys.executable)), \
                     patch.object(bootstrap.subprocess, 'run', side_effect=command) as calls:
                 self.assertEqual(bootstrap.prepare_dependencies(REPO, root, io.StringIO()), Path(sys.executable))
             self.assertFalse(any('install' in c.args[0] for c in calls.call_args_list))
@@ -129,6 +130,7 @@ class BootstrapTests(unittest.TestCase):
                     raise subprocess.CalledProcessError(1, args)
                 return subprocess.CompletedProcess(args, 0)
             with patch('mmd_fraud.bootstrap.is_colab', return_value=True), \
+                    patch.object(bootstrap, 'select_python', return_value=Path(sys.executable)), \
                     patch.object(bootstrap.subprocess, 'run', side_effect=command) as calls:
                 with self.assertRaises(subprocess.CalledProcessError):
                     bootstrap.prepare_dependencies(REPO, root, io.StringIO())
@@ -136,21 +138,64 @@ class BootstrapTests(unittest.TestCase):
             self.assertFalse((root / 'dependencies.json').exists())
 
     def test_real_fresh_interpreter_imports_without_using_ensurepip(self):
-        # Simulate Colab mode under the CI/cloud interpreter. Only an editable local
-        # install can be needed; all dependency pins must already be installed by CI.
+        # Exercise a REAL empty isolated environment using runtime pip, with ensurepip absent.
+        # Downloads are pinned packages only; never an external dataset.
         pins = bootstrap.locked_versions(REPO / 'requirements-cloud.lock')
         probe = subprocess.run([sys.executable, '-c', bootstrap.PROBE,
                                 json.dumps({'pins': pins, 'repo': str(REPO)})],
                                check=True, capture_output=True, text=True)
         self.assertEqual(json.loads(probe.stdout)['missing'], {})
         with tempfile.TemporaryDirectory() as temp, patch('mmd_fraud.bootstrap.is_colab', return_value=True), \
-                patch.object(bootstrap.venv, 'create', side_effect=ModuleNotFoundError('ensurepip')) as create:
+                patch.object(bootstrap.importlib.util, 'find_spec', return_value=None), \
+                patch.object(bootstrap.venv, 'create', wraps=bootstrap.venv.create) as create:
             root = Path(temp)
             with (root / 'bootstrap.log').open('w') as log:
                 selected = bootstrap.prepare_dependencies(REPO, root, log)
                 # Second run checks actual installed metadata and must skip all installs.
                 with patch.object(bootstrap.subprocess, 'run', wraps=subprocess.run) as commands:
                     bootstrap.prepare_dependencies(REPO, root, log)
-            create.assert_not_called()
-            self.assertEqual(str(selected), sys.executable)
+            create.assert_called_once_with(selected.parent.parent, with_pip=False)
+            self.assertEqual(selected.parent.parent.parent, root)
+            self.assertNotEqual(str(selected), sys.executable)
             self.assertFalse(any('install' in c.args[0] for c in commands.call_args_list))
+
+    def test_global_conflicts_are_reported_and_target_pip_check_is_mandatory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            log = io.StringIO()
+            target = Path(temp) / 'colab-venv-3.13/bin/python'
+            def command(args, **kwargs):
+                if args == [sys.executable, '-m', 'pip', 'check']:
+                    return subprocess.CompletedProcess(args, 1)  # existing missing jedi/bigframes conflict
+                if bootstrap.PROBE in args:
+                    return subprocess.CompletedProcess(args, 0, json.dumps({'missing': {}, 'editable': True}))
+                if args[-1] == 'check':
+                    raise subprocess.CalledProcessError(1, args)
+                return subprocess.CompletedProcess(args, 0)
+            with patch('mmd_fraud.bootstrap.is_colab', return_value=True), \
+                    patch.object(bootstrap, 'select_python', return_value=target), \
+                    patch.object(bootstrap.subprocess, 'run', side_effect=command) as calls:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    bootstrap.prepare_dependencies(REPO, Path(temp), log)
+            self.assertIn('Global pip check exit status: 1', log.getvalue())
+            self.assertTrue(any(c.args[0][:5] == [sys.executable, '-m', 'pip', '--python', str(target)]
+                                for c in calls.call_args_list))
+            self.assertFalse((Path(temp) / 'dependencies.json').exists())
+            for call in calls.call_args_list:
+                args = call.args[0]
+                if 'install' in args:
+                    self.assertIn('--python', args)
+
+    def test_partial_colab_isolated_environment_is_rebuilt_without_pip(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            environment = root / f'colab-venv-{sys.version_info.major}.{sys.version_info.minor}'
+            environment.mkdir()
+            (environment / 'partial').touch()
+            with patch('mmd_fraud.bootstrap.is_colab', return_value=True), \
+                    patch.object(bootstrap.subprocess, 'run', side_effect=FileNotFoundError('partial python')), \
+                    patch.object(bootstrap.importlib.util, 'find_spec', return_value=None), \
+                    patch.object(bootstrap.venv, 'create') as create:
+                selected = bootstrap.select_python(root, io.StringIO())
+            create.assert_called_once_with(environment, with_pip=False)
+            self.assertEqual(selected, environment / 'bin/python')
+            self.assertFalse((environment / 'partial').exists())

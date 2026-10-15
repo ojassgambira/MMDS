@@ -85,43 +85,56 @@ def logged(command, log, **kwargs):
 
 
 def select_python(workspace: Path, log) -> Path:
-    if is_colab():
-        python = Path(sys.executable)
-        log.write(f'Colab runtime mode: {python}; ensurepip/venv creation is bypassed.\n')
-        log.write('Prior workspace venv directories are ignored; datasets/checkpoints are retained.\n')
-        return python
-    environment = workspace / f'venv-{sys.version_info.major}.{sys.version_info.minor}'
+    colab = is_colab()
+    prefix = 'colab-venv' if colab else 'venv'
+    environment = workspace / f'{prefix}-{sys.version_info.major}.{sys.version_info.minor}'
+    if colab:
+        log.write('Colab isolated mode: runtime pip targets a venv created WITHOUT pip/ensurepip.\n')
+        log.write('Global Colab packages and prior workspace venvs are retained.\n')
     python = environment / 'bin/python'
     if environment.is_symlink():
         raise ValueError(f'refusing to rebuild a symlinked virtual environment: {environment}')
     if environment.exists():
         try:
             logged([str(python), '-c',
-                    'import sys, pip; assert sys.prefix != sys.base_prefix; '
+                    ('import sys; ' if colab else 'import sys, pip; ') +
+                    'assert sys.prefix != sys.base_prefix; '
                     f'assert sys.version_info[:2] == {sys.version_info[:2]!r}'], log, stdout=log)
             log.write('Existing isolated environment is healthy.\n')
             return python
         except (OSError, subprocess.SubprocessError) as exc:
             log.write(f'Rebuilding incomplete isolated environment: {type(exc).__name__}: {exc}\n')
             shutil.rmtree(environment)
-    if importlib.util.find_spec('ensurepip') is None:
+    if not colab and importlib.util.find_spec('ensurepip') is None:
         raise RuntimeError('This non-Colab cloud Python lacks ensurepip; use a Python installation '
-                           'with venv/ensurepip support. Colab uses runtime pip and does not need it.')
-    venv.create(environment, with_pip=True)
+                           'with venv/ensurepip support. Colab uses runtime pip targeting a pip-free venv.')
+    venv.create(environment, with_pip=not colab)
     return python
 
 
 def prepare_dependencies(repo: Path, workspace: Path, log) -> Path:
     python = select_python(workspace, log)
     log.flush()
-    logged([str(python), '-m', 'pip', '--version'], log, stdout=log)
+    # pip --python can manage an empty venv: no target pip or ensurepip is required.
+    pip = ([sys.executable, '-m', 'pip', '--python', str(python)] if is_colab()
+           else [str(python), '-m', 'pip'])
+    if is_colab():
+        log.write('Pre-existing global pip check (not MMDS consistency):\n')
+        global_check = subprocess.run([sys.executable, '-m', 'pip', 'check'],
+                                      stdout=log, stderr=log, timeout=60)
+        if global_check.returncode:
+            print('Colab global pip check reports existing conflicts (bootstrap.log). '
+                  'MMDS uses a separate environment; global packages are preserved.', flush=True)
+        log.write(f'Global pip check exit status: {global_check.returncode}; '
+                  'global packages are never modified.\n')
+    logged(pip + ['--version'], log, stdout=log)
     pins = locked_versions(repo / 'requirements-cloud.lock')
     request = json.dumps({'pins': pins, 'repo': str(repo)})
     result = logged([str(python), '-c', PROBE, request], log, stdout=subprocess.PIPE, text=True)
     installed = json.loads(result.stdout)
     if installed['missing']:
         log.write('Installing only missing/mismatched pins: ' + json.dumps(installed['missing']) + '\n')
-        logged([str(python), '-m', 'pip', 'install', '--retries', '0', '--timeout', '30',
+        logged(pip + ['install', '--retries', '0', '--timeout', '30',
                 '-r', str(repo / 'requirements-cloud.lock')], log, stdout=log)
     else:
         log.write('All dependency pins already match; skipping pip install.\n')
@@ -133,16 +146,14 @@ def prepare_dependencies(repo: Path, workspace: Path, log) -> Path:
     except (OSError, ValueError):
         stamp = None
     if not installed['editable'] or stamp != expected:
-        logged([str(python), '-m', 'pip', 'install', '--no-build-isolation', '--no-deps',
+        logged(pip + ['install', '--no-build-isolation', '--no-deps',
                 '-e', str(repo)], log, stdout=log)
     else:
         log.write('Editable project metadata is current; skipping project reinstall.\n')
     # A new child interpreter avoids stale imports cached by the notebook kernel.
     logged([str(python), '-c', VERIFY, json.dumps(pins)], log, stdout=log)
-    if not is_colab():
-        logged([str(python), '-m', 'pip', 'check'], log, stdout=log)
-    else:
-        log.write('Colab: MMDS dependency closure checked; unrelated global packages are outside this check.\n')
+    logged(pip + ['check'], log, stdout=log)
+    log.write('Isolated environment: full pip check and fresh-process MMDS imports passed.\n')
     temporary = stamp_path.with_suffix('.tmp')
     temporary.write_text(json.dumps(expected, indent=2) + '\n')
     temporary.replace(stamp_path)

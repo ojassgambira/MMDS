@@ -7,7 +7,7 @@ University Mining of Massive Datasets project: distributed graph mining, tempora
 analytics, and machine learning across Bitcoin and banking domains.
 
 Phase 1 provides bounded CSV adapters, validation, a domain-aware feature contract,
-generated Spark smoke data and cloud CI. No models have been trained.
+generated Spark smoke data and cloud CI. Generated-fixture models are used only for pipeline regression checks.
 
 Development commands run in **Codex Cloud or GitHub-hosted CI**, never on a local Mac.
 For free browser-based data execution, see the [Google Colab guide](docs/colab.md)
@@ -15,7 +15,8 @@ and [MMDS Cloud Pipeline notebook](notebooks/MMDS_Cloud_Pipeline.ipynb).
 Use **Runtime → Run all**: dependencies, tests, bounded acquisition, PySpark,
 chronological initial baselines, metrics, private Drive checkpoints and a report
 run through one entry point. See [verification evidence](docs/automation-verification.md)
-for what actually executed. No real-data or Colab results are implied by code.
+for what actually executed, and [Issue #7](docs/issue-7.md) for measured ZIP budgets
+and automatic real-release validation in GitHub-hosted CI. No real-data or Colab results are implied by code.
 See [cloud setup](docs/cloud-setup.md), [architecture](docs/architecture.md),
 [data sources](docs/data-sources.md), [AMLSim feasibility](docs/amlsim-feasibility.md),
 [reproducibility](docs/reproducibility.md), [benchmarks](docs/benchmarks.md),
