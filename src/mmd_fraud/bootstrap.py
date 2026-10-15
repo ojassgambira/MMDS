@@ -53,7 +53,7 @@ for name, expected in pins.items():
             continue
         actual = m.version(requirement.name)
         assert actual in requirement.specifier, f'{name} requires {requirement}; installed {actual}'
-for module in ('pyspark', 'numpy', 'scipy', 'sklearn', 'pyarrow', 'mmd_fraud'):
+for module in ('pyspark', 'numpy', 'scipy', 'sklearn', 'pyarrow', 'matplotlib', 'mmd_fraud'):
     loaded = importlib.import_module(module)
     print(module, getattr(loaded, '__version__', 'import OK'))
 print('MMDS pinned dependency closure and fresh-process imports verified')

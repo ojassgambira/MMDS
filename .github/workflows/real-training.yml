@@ -62,6 +62,8 @@ jobs:
             ${{ runner.temp }}/mmds-public/training-summary.json
             ${{ runner.temp }}/mmds-public/training-report.md
             ${{ runner.temp }}/mmds-public/training-evidence-manifest.json
+            ${{ runner.temp }}/mmds-public/research-report.md
+            ${{ runner.temp }}/mmds-public/research-results.png
           retention-days: 7
       - if: always()
         name: Delete private datasets, models, checkpoints and logs
