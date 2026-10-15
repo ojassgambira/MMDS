@@ -118,7 +118,19 @@ class AutomationTests(unittest.TestCase):
             config = {"source": "generated_test_fixture", "input_directory": str(raw),
                       "data_mode": "full", "train_end": 34, "validation_end": 39}
             repo = Path(__file__).resolve().parents[1]
-            output = run_workflow(repo, root / "workspace", config, root / "store", run_tests=False)
+            with patch("mmd_fraud.automation.archive", side_effect=OSError("Drive quota exhausted")):
+                with self.assertRaisesRegex(OSError, "Drive quota exhausted"):
+                    run_workflow(repo, root / "workspace", config, root / "store", run_tests=False)
+            storage_failure = json.loads((root / "workspace/failure.json").read_text())
+            self.assertEqual(storage_failure["stage"], "storage")
+            with patch("mmd_fraud.training.baselines.train", side_effect=ValueError("training blocked")):
+                with self.assertRaisesRegex(ValueError, "training blocked"):
+                    run_workflow(repo, root / "workspace", config, root / "store", run_tests=False)
+            failure = json.loads((root / "workspace/failure.json").read_text())
+            self.assertEqual(failure["stage"], "models")
+            with patch("mmd_fraud.spark.pipeline.run", side_effect=AssertionError("reprocessed checkpoint")):
+                output = run_workflow(repo, root / "workspace", config, root / "store", run_tests=False)
+            self.assertFalse((root / "workspace/failure.json").exists())
             state = json.loads((output / "execution.json").read_text())
             self.assertEqual(state["status"], "success")
             self.assertEqual(state["dataset_kind"], "generated_test_fixture")

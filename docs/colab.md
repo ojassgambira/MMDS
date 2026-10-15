@@ -3,12 +3,12 @@
 The notebook now has one execution cell. Open it in a **free hosted Colab CPU**
 runtime and select **Runtime → Run all**. It automatically loads the automation
 branch before merge (main if that branch has been deleted), installs dependencies
-in an isolated environment, runs tests, acquires the original Elliptic release,
+with runtime pip in Colab (isolated venvs elsewhere), runs tests, acquires the original Elliptic release,
 validates/preprocesses it in Spark, builds temporal graph predictors, trains three
 bounded baselines, computes metrics and writes a report. No workload runs on your
 Mac or iPhone, and no paid compute or storage is provisioned.
 
-[Open the notebook](https://colab.research.google.com/github/ojassgambira/MMDS/blob/automation/run-all/notebooks/MMDS_Cloud_Pipeline.ipynb).
+[Open the notebook](https://colab.research.google.com/github/ojassgambira/MMDS/blob/fix/colab-runtime-pip/notebooks/MMDS_Cloud_Pipeline.ipynb).
 After branch deletion, open the same notebook from main through Colab's GitHub tab.
 
 ## Browser instructions and unavoidable actions
@@ -44,9 +44,12 @@ See [verification evidence](automation-verification.md) for actual results.
 
 `requirements-cloud.lock` includes the existing development pins and NumPy 2.2.6,
 SciPy 1.15.3, scikit-learn 1.7.2, joblib 1.5.2, threadpoolctl 3.6.0 and PyArrow 20.0.0.
-The entry point creates a virtual environment with the current interpreter and
-runs `pip check`. Colab's globally preinstalled packages are untouched, and no
-kernel restart is needed. Java is checked before work. A future Python 3.14+
+In Colab the entry point uses the existing runtime interpreter and `python -m pip`;
+it never invokes `venv` or `ensurepip`. Required pins can update global runtime
+packages. Models and verification imports run in fresh subprocesses, so no kernel
+restart is needed. Other cloud environments use a checked isolated venv and
+`pip check`. Colab verifies the MMDS dependency closure and imports without
+failing on unrelated preinstalled packages outside that closure. Java is checked before work. A future Python 3.14+
 runtime is deliberately unsupported until tested; select a compatible Colab
 runtime rather than deleting the version check. No downgrade is performed.
 
@@ -169,3 +172,90 @@ manifest is published. Interrupted copies do not count as completed stages.
 Failure reports remain available in temporary storage even if Drive copying
 fails. Do not equate a passed synthetic integration test with real Elliptic access,
 Colab execution or measured real-data model quality.
+
+## Self-diagnosing failures
+
+The reported Colab Python 3.13 failure (`CalledProcessError`, exit status 1) does
+not establish its root cause. Colab runtime logs were not supplied or accessed.
+This update fixes reproducible diagnostic defects rather than claiming to solve
+an unobserved dependency, source-access, Spark or training error.
+
+The notebook catches repository setup, Drive mounting and pipeline errors in one
+place. It displays the underlying exception, failed phase and final relevant
+lines from `bootstrap.log`, `runtime.log`, `worker.log` and the active run's
+`execution.log`. Log reads are bounded, missing logs are identified, and common
+credential fields are redacted. It finishes with `pipeline_succeeded = False`
+and an explicit **FAILED** status when work stops; a completed notebook cell
+alone does not mean the pipeline succeeded. Successful runs still display their
+report. The diagnostics PR is selected automatically before merge; after that
+branch is deleted the notebook selects main, avoiding the older automation branch.
+
+`failure.json` contains an independently readable error and instruction, including
+failures before a run report exists. Preflight validates configuration types,
+source CSV paths, supported Python, Java, path separation, the real Drive mount
+and a write/read probe before installing dependencies. Python 3.11–3.13 remains
+the tested range; no package pins or version guard are weakened speculatively.
+
+Dependency/venv errors retain pip output in `bootstrap.log`. Worker tracebacks
+are written before stderr is restored, so `runtime.log` includes the actual
+exception. Startup errors and signal exits have `worker.log` as a fallback.
+Failed test commands include their check-log tail. Preprocessing, acquisition,
+training and storage errors identify their phase and preserve completed local
+checkpoints. If the first Drive copy was interrupted before publishing its
+manifest, its folder is not treated as a complete checkpoint; uncommitted copies
+can restart safely. Committed checkpoints are still hash-verified and never
+silently overwritten. Drive quota/write failures retain local evidence and
+instruct the user to check existing storage, then Run all again.
+
+An acquisition HTTP 401/403 displays one authorization/access instruction: accept
+publisher terms/authorize access through the official Kaggle release and supply
+its three CSVs privately through an `existing` configuration. This does not mean
+that PyG normally requires Kaggle credentials, nor does it diagnose every 403 as
+an authentication problem. The mirror remains the credential-free default, and
+no denied download is automatically retried or bypassed.
+
+All new failure tests use generated fixtures, mocked failures or a simulated
+notebook environment. They do not establish real Colab/Drive integration or
+real-data results. See the PR's Python 3.11–3.13 CI results for compatibility checks.
+
+A new setup or Drive authorization error takes precedence over a prior attempt's
+failure record. Logs from before worker launch are labelled as possibly historical,
+so stale output is not mistaken for the cause of the current failure.
+
+
+## Confirmed Colab Python 3.13 ensurepip fix
+
+The reported dependency failure is confirmed: Colab's Python can provide pip
+without the optional ensurepip module, so `venv.create(..., with_pip=True)` is
+not a usable default there. Colab is detected using `/content` with
+`COLAB_RELEASE_TAG` or `COLAB_BACKEND_VERSION`; the notebook's validated
+`MMDS_COLAB_RUNTIME` marker is also inherited by worker processes. An installed
+`google.colab` package alone does not select Colab mode.
+
+Colab bootstrap uses `sys.executable -m pip`, ignores previously failed workspace
+venvs, and logs the selected interpreter and mode. It probes installed package
+versions on each invocation, installs only if pins are missing/mismatched, and
+refreshes editable project metadata only if its location/pyproject hash changed.
+No `--force-reinstall` or unconditional upgrade is used. A successful cache stamp
+is written only after dependency checks and actual fresh-process imports pass.
+The verified pins continue to support Python 3.11–3.13; they were not loosened to
+work around missing ensurepip.
+
+Colab's unrelated global packages are not included in the MMDS dependency check:
+the pinned closure, its active dependency requirements and model-library imports
+are verified explicitly. The notebook kernel may retain earlier module imports,
+but the pipeline never reuses those for model execution: the worker and Spark
+Python processes use the selected interpreter, with the checkout on PYTHONPATH.
+
+Other cloud environments retain venv isolation. Existing venvs must have the
+correct Python version, isolated prefix and working pip. Incomplete/broken venv
+directories are rebuilt within the generated workspace venv path; symlinked
+venvs are rejected. A non-Colab Python without ensurepip reports that exact
+missing prerequisite rather than downloading an unaudited bootstrap script.
+Old Colab venv directories can remain unused; raw data, Drive output paths and
+verified pipeline checkpoints are not deleted. A change in interpreter/package
+versions can correctly produce a new run key.
+
+Tests simulate missing ensurepip and execute real child-process import and
+idempotence checks in Codex Cloud/GitHub CI. They are not actual hosted Colab
+execution, Drive integration, dataset acquisition or real-data training results.
