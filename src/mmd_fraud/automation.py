@@ -95,13 +95,13 @@ def report(directory: Path, state: dict) -> None:
                   f"Selected on validation average precision: `{metrics['selected_model']}`.",
                   "Threshold fixed at 0.5; PR-AUC is average precision (not trapezoidal area).",
                   "Confusion matrices use rows=true, columns=predicted, order [licit, illicit].",
-                  "", "| Model | Period | Precision | Recall | F1 | PR-AUC (AP) | Matrix |",
-                  "| --- | --- | ---: | ---: | ---: | ---: | --- |"]
+                  "", "| Model | Period | Precision | Recall | F1 | PR-AUC (AP) | FPR | Matrix |",
+                  "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |"]
         for name, periods in metrics["models"].items():
             for period, m in periods.items():
                 lines.append(f"| {name} | {period} | {m['precision']:.4f} | {m['recall']:.4f} "
                              f"| {m['f1']:.4f} | {m['pr_auc_average_precision']:.4f} "
-                             f"| {m['confusion_matrix']} |")
+                             f"| {m['false_positive_rate']:.4f} | {m['confusion_matrix']} |")
         lines += ["", "### Split counts", "", "```json",
                   json.dumps(metrics["split_counts"], indent=2), "```"]
     if state.get("error"):
@@ -222,7 +222,14 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
             shutil.rmtree(target)
         print(f"Running stage: {name}", flush=True)
         began = time.monotonic()
-        action(target)
+        # Publish active stage locally before work: process termination may bypass except.
+        write_json(state_file, state)
+        try:
+            action(target)
+        except Exception:
+            state["failed_stage_seconds"] = time.monotonic() - began
+            raise
+        state.pop("failed_stage_seconds", None)
         state["stages"][name] = {"seconds": time.monotonic() - began,
                                  "hashes": inventory(target)}
         save()

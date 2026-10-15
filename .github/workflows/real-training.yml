@@ -1,0 +1,68 @@
+name: Unattended real-data training
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      data_mode:
+        description: Full release or correctness sample (never silently substituted)
+        type: choice
+        options: [full, sample]
+        default: full
+concurrency:
+  group: real-training-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  train:
+    if: github.repository == 'ojassgambira/MMDS' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      SPARK_LOCAL_IP: 127.0.0.1
+      PYSPARK_PYTHON: python
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+      MMDS_PUBLIC_REPOSITORY: ${{ github.event.repository.private == false }}
+      MMDS_DATA_MODE: ${{ inputs.data_mode || 'full' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: python -m pip install -r requirements-cloud.lock
+      - run: python -m pip install --no-build-isolation --no-deps -e .
+      - run: python -m pip check
+      - name: License, size, tests, Spark, chronological baselines and report
+        run: python scripts/run_training_job.py --workspace "$RUNNER_TEMP/mmds-private" --evidence "$RUNNER_TEMP/mmds-public" --data-mode "$MMDS_DATA_MODE"
+      - if: always()
+        name: Publish aggregate summary
+        run: |
+          if [ -f "$RUNNER_TEMP/mmds-public/training-report.md" ]; then
+            cat "$RUNNER_TEMP/mmds-public/training-report.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'MMDS failed before a training report was created. Inspect dependency/setup step status; no training success claimed.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/mmds-public/training-summary.json
+            ${{ runner.temp }}/mmds-public/training-report.md
+            ${{ runner.temp }}/mmds-public/training-evidence-manifest.json
+          retention-days: 7
+      - if: always()
+        name: Delete private datasets, models, checkpoints and logs
+        run: rm -rf -- "$RUNNER_TEMP/mmds-private"

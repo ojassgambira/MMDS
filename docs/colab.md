@@ -1,5 +1,9 @@
 # MMDS: one-command cloud execution
 
+For unattended execution without a Colab session or Drive authorization, use
+[the free GitHub-hosted training workflow](unattended-training.md). Colab remains
+an optional route for private persistent artifacts.
+
 The notebook now has one execution cell. Open it in a **free hosted Colab CPU**
 runtime and select **Runtime → Run all**. It automatically loads the automation
 branch before merge (main if that branch has been deleted), installs dependencies
