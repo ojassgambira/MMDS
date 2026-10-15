@@ -114,3 +114,32 @@ before any dependency installation. This establishes error visibility, not real
 Colab execution or model results. The PR's full Python 3.11–3.13 CI matrix provides
 committed-source regression evidence; the actual reported Colab root cause remains
 unknown until a run's underlying diagnostics are available.
+
+## Confirmed Colab ensurepip failure (2026-10-15)
+
+The user subsequently supplied the confirmed dependency-stage cause: their Colab
+Python 3.13 runtime lacked `ensurepip`, and `venv.create(..., with_pip=True)` failed
+before acquisition/training. This establishes the reported failure mechanism;
+no access to that private Colab runtime or its live logs was available here.
+
+The bootstrap now selects runtime Python/pip in hosted Colab using runtime-specific
+environment information, without creating or repairing a Colab venv. Earlier
+failed Colab venv directories are ignored. Other supported cloud environments
+retain checked/recoverable isolated venvs. Package metadata is probed before any
+install; current pins and current editable project metadata skip reinstalls.
+Verification imports and the worker run under the selected interpreter in fresh
+processes, with the checkout explicitly available through PYTHONPATH.
+
+The existing pins remain unchanged: missing ensurepip is not a package-version
+incompatibility. Tests simulate its absence, partial/broken environments and
+Colab environment markers, verify the worker/Spark interpreter choice, and run
+actual fresh-process dependency checks and a second idempotent preparation in
+Codex Cloud/GitHub CI. No real dataset acquisition or hosted Colab execution is
+claimed. Drive paths, raw caches and pipeline checkpoints retain their existing
+behavior; only workspace venv directories in non-Colab mode can be rebuilt.
+
+Initial current-fix verification in Codex Cloud: 60 pytest tests passed in 149.23
+seconds, including actual child-process imports and idempotent second preparation
+under simulated Colab mode. Ruff and the installed environment's pip check passed.
+The PR's Python 3.11/3.12/3.13 checks are the committed-source compatibility record.
+These checks do not establish successful execution in the user's hosted Colab.

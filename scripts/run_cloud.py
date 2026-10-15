@@ -1,6 +1,5 @@
 """Single cloud entry point with actionable diagnostics for every failure phase."""
 import argparse
-import importlib.util
 import json
 import os
 from pathlib import Path
@@ -9,44 +8,27 @@ import signal
 import subprocess
 import sys
 import traceback
-import venv
 
 REPO = Path(__file__).resolve().parents[1]
 
 
 def require_cloud():
+    from mmd_fraud.runtime import is_colab
+    if is_colab():
+        os.environ['MMDS_COLAB_RUNTIME'] = '1'
+        return
     if Path('/etc/codex/network-policy.json').is_file() or os.environ.get('GITHUB_ACTIONS') == 'true':
         return
-    if Path('/content').is_dir():
-        if os.environ.get('MMDS_COLAB_RUNTIME') == '1':
-            return
-        try:
-            if importlib.util.find_spec('google.colab'):
-                os.environ['MMDS_COLAB_RUNTIME'] = '1'
-                return
-        except ModuleNotFoundError:
-            pass
     raise RuntimeError('Use a hosted cloud runtime; local device execution is refused')
 
 
 def bootstrap(args):
+    from mmd_fraud.bootstrap import prepare_dependencies
     args.phase = 'dependencies'
-    environment = args.workspace / f'venv-{sys.version_info.major}.{sys.version_info.minor}'
-    python = environment / 'bin/python'
     with (args.workspace / 'bootstrap.log').open('a') as log:
         try:
-            if not python.exists():
-                venv.create(environment, with_pip=True)
-            for command in (
-                [str(python), '-m', 'pip', 'install', '--retries', '0', '--timeout', '30',
-                 '-r', str(REPO / 'requirements-cloud.lock')],
-                [str(python), '-m', 'pip', 'install', '--no-build-isolation', '--no-deps', '-e', str(REPO)],
-                [str(python), '-m', 'pip', 'check'],
-            ):
-                log.write(json.dumps(command) + '\n')
-                log.flush()
-                print('Installing/checking pinned cloud dependencies…', flush=True)
-                subprocess.run(command, stdout=log, stderr=log, check=True, timeout=900)
+            print('Checking/preparing compatible cloud dependencies…', flush=True)
+            python = prepare_dependencies(REPO, args.workspace, log)
         except Exception:
             traceback.print_exc(file=log)
             raise
@@ -56,6 +38,7 @@ def bootstrap(args):
     if args.storage:
         command.extend(['--storage', str(args.storage)])
     env = {**os.environ, 'SPARK_LOCAL_IP': '127.0.0.1', 'PYSPARK_PYTHON': str(python),
+           'PYTHONPATH': str(REPO / 'src'),
            'OMP_NUM_THREADS': '2', 'OPENBLAS_NUM_THREADS': '2', 'PYTHONUNBUFFERED': '1'}
     with (args.workspace / 'worker.log').open('a') as log:
         process = subprocess.Popen(command, env=env, stderr=log, start_new_session=True)
@@ -96,6 +79,7 @@ def worker(args, config):
 
 
 def main(argv=None):
+    sys.path.insert(0, str(REPO / 'src'))
     require_cloud()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--workspace', type=Path, required=True)
@@ -103,7 +87,6 @@ def main(argv=None):
     parser.add_argument('--config', type=Path, default=REPO / 'configs/cloud-pipeline.json')
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
-    sys.path.insert(0, str(REPO / 'src'))
     from mmd_fraud.data.acquire import outside_repo
     from mmd_fraud.cloud_config import validate_config, validate_paths
     from mmd_fraud.diagnostics import failure_details, record_failure

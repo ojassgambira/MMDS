@@ -113,7 +113,8 @@ class DiagnosticTests(unittest.TestCase):
                     return subprocess.CompletedProcess(command, 0, "", 'openjdk version "21.0.1"')
                 kwargs["stderr"].write("ERROR: dependency wheel unavailable\n")
                 raise subprocess.CalledProcessError(1, command)
-            with patch.object(entry, "require_cloud"), patch.object(entry.venv, "create"), \
+            with patch.object(entry, "require_cloud"), \
+                    patch("mmd_fraud.bootstrap.select_python", return_value=Path(sys.executable)), \
                     patch.object(entry.subprocess, "run", side_effect=failed), \
                     contextlib.redirect_stderr(io.StringIO()) as display:
                 code = entry.main(["--workspace", str(root)])

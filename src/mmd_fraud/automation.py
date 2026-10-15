@@ -15,15 +15,16 @@ from pathlib import Path
 from mmd_fraud.data.acquire import FILES, SOURCE, acquire, outside_repo, sha256
 from mmd_fraud.cloud_config import validate_config, validate_paths
 from mmd_fraud.diagnostics import record_failure, redact, tail
+from mmd_fraud.runtime import is_colab
 
 
 def cloud_runtime() -> str:
+    if is_colab():
+        return "colab"
     if Path("/etc/codex/network-policy.json").is_file():
         return "codex_cloud"
     if os.environ.get("GITHUB_ACTIONS") == "true":
         return "github_ci"
-    if Path("/content").is_dir() and os.environ.get("MMDS_COLAB_RUNTIME") == "1":
-        return "colab"
     raise RuntimeError("Execute only in Codex Cloud, Google Colab or GitHub CI; no device workloads")
 
 
@@ -168,7 +169,7 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
     state.pop("error", None)
     env = {**os.environ, "SPARK_LOCAL_IP": "127.0.0.1", "PYSPARK_PYTHON": sys.executable,
            "PYTHONPATH": str(repo / "src"), "OMP_NUM_THREADS": "2",
-           "OPENBLAS_NUM_THREADS": "2"}
+           "OPENBLAS_NUM_THREADS": "2", "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"}
     def save():
         for name in ("bootstrap.log", "runtime.log"):
             if (workspace / name).exists():
