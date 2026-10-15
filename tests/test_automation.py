@@ -136,6 +136,13 @@ class AutomationTests(unittest.TestCase):
             self.assertEqual(state["dataset_kind"], "generated_test_fixture")
             self.assertEqual(json.loads((output / "preprocess/run.json").read_text())
                              ["validation"]["nodes"], 196)
+            # Only generated-fixture reports may be exported from this test.
+            evidence = os.environ.get("MMDS_TEST_REPORT_DIRECTORY")
+            if evidence:
+                evidence = Path(evidence)
+                evidence.mkdir(parents=True, exist_ok=True)
+                for name in ("report.md", "execution.json"):
+                    shutil.copy2(output / name, evidence / f"generated-{name}")
             model_hashes = inventory(output / "models")
             shutil.rmtree(root / "workspace")
             restored = run_workflow(repo, root / "workspace", config,

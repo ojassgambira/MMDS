@@ -5,11 +5,11 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
-from .acquire import FILES, outside_repo, sha256
+from .acquire import FILES, outside_repo, sha256, MAX_EXPANDED_BYTES
 
 
 def sample_elliptic(source: Path, destination: Path, per_step: int = 40,
-                   max_rows: int = 300000, max_bytes: int = 500000000,
+                   max_rows: int = 300000, max_bytes: int = MAX_EXPANDED_BYTES,
                    max_sample_edges: int = 10000) -> dict:
     """Keep the first per_step transactions at each source step, then induced edges.
 

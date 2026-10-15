@@ -3,12 +3,12 @@
 The notebook now has one execution cell. Open it in a **free hosted Colab CPU**
 runtime and select **Runtime → Run all**. It automatically loads the automation
 branch before merge (main if that branch has been deleted), installs dependencies
-with runtime pip in Colab (isolated venvs elsewhere), runs tests, acquires the original Elliptic release,
+with isolated dependencies in every cloud runtime, runs tests, acquires the original Elliptic release,
 validates/preprocesses it in Spark, builds temporal graph predictors, trains three
 bounded baselines, computes metrics and writes a report. No workload runs on your
 Mac or iPhone, and no paid compute or storage is provisioned.
 
-[Open the notebook](https://colab.research.google.com/github/ojassgambira/MMDS/blob/fix/colab-runtime-pip/notebooks/MMDS_Cloud_Pipeline.ipynb).
+[Open the notebook](https://colab.research.google.com/github/ojassgambira/MMDS/blob/fix/issue-7-acquisition/notebooks/MMDS_Cloud_Pipeline.ipynb).
 After branch deletion, open the same notebook from main through Colab's GitHub tab.
 
 ## Browser instructions and unavoidable actions
@@ -22,8 +22,10 @@ After branch deletion, open the same notebook from main through Colab's GitHub t
 4. Authorize Google Drive when Colab prompts. The default private destination is
    `My Drive/MMDS/automated`. The optional form selector offers temporary Colab
    storage instead; it disappears on reset. Check your existing Drive capacity;
-   do not purchase storage for this workflow. Allow roughly 3 GB free in both
-   runtime and persistent storage for raw data, processed tables and copies.
+   do not purchase storage for this workflow. Reserve at least 6 GB free runtime disk for dependencies, raw data, Spark
+   checkpoints and copies, plus 3 GB in private Drive for outputs. Acquisition
+   checks its 950 MB disk reserve; preprocessing additionally checks four times
+   input bytes (about 2.8 GB). These are safety reserves, not measured peak usage.
 5. Read the report displayed at completion. Persistent reports and artifacts are
    under `MMDS/automated/runs/<run-key>`. The report/manifest must say `success`;
    a directory or a partial checkpoint alone is not a successful execution.
@@ -44,12 +46,16 @@ See [verification evidence](automation-verification.md) for actual results.
 
 `requirements-cloud.lock` includes the existing development pins and NumPy 2.2.6,
 SciPy 1.15.3, scikit-learn 1.7.2, joblib 1.5.2, threadpoolctl 3.6.0 and PyArrow 20.0.0.
-In Colab the entry point uses the existing runtime interpreter and `python -m pip`;
-it never invokes `venv` or `ensurepip`. Required pins can update global runtime
-packages. Models and verification imports run in fresh subprocesses, so no kernel
-restart is needed. Other cloud environments use a checked isolated venv and
-`pip check`. Colab verifies the MMDS dependency closure and imports without
-failing on unrelated preinstalled packages outside that closure. Java is checked before work. A future Python 3.14+
+Colab uses its existing `python -m pip --python <isolated-python>` to manage a
+workspace environment created with `venv.create(..., with_pip=False)`. This works
+without ensurepip or pip inside that environment and preserves global PyArrow,
+bigframes, datasets and IPython. No global package is installed/downgraded.
+Pre-existing global `pip check` results (including missing jedi if present) are
+recorded honestly in bootstrap.log; they are not repaired or called consistent.
+The isolated environment must pass a full pip check and fresh-process imports.
+Other clouds retain regular isolated venvs. Worker/Spark processes use the isolated
+interpreter, so the notebook kernel needs no restart. Pip must support `--python`
+(pip >=22.3, provided by supported modern Colab runtimes). Java is checked before work. A future Python 3.14+
 runtime is deliberately unsupported until tested; select a compatible Colab
 runtime rather than deleting the version check. No downgrade is performed.
 
@@ -97,9 +103,13 @@ Default full processing avoids sampling bias for the initial baseline.
 Source: [publisher's original Elliptic release](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set).
 Automatic acquisition uses its documented [PyG mirror](https://data.pyg.org/datasets/elliptic),
 with no Kaggle credential. The existing downloader caps total compressed bytes at
-200 MB and expanded bytes at 500 MB, validates archive structure, rejects
+200 MB and expanded bytes at 750 MB (decimal bytes), validates archive structure, rejects
 unexpected redirects, records SHA-256 provenance and publishes only complete
-acquisitions. No denied destination is retried or bypassed. Mirror availability
+acquisitions. The measured original CSVs total 697,459,499 bytes; the features CSV
+alone exceeds the old 500 MB limit. Independent `max_download_bytes`,
+`max_expanded_bytes`, and `acquisition_seconds` are configurable, bounded at
+300 MB, 1 GB and 1,800 seconds respectively. Defaults allow 600 seconds and
+retain the 60-second request timeout. See [measured release and CI](issue-7.md). No denied destination is retried or bypassed. Mirror availability
 is established only by an actual successful run; it is not guaranteed by code.
 
 Codex Cloud dataset downloads remain disabled per the user's earlier instruction.
@@ -175,10 +185,10 @@ Colab execution or measured real-data model quality.
 
 ## Self-diagnosing failures
 
-The reported Colab Python 3.13 failure (`CalledProcessError`, exit status 1) does
-not establish its root cause. Colab runtime logs were not supplied or accessed.
-This update fixes reproducible diagnostic defects rather than claiming to solve
-an unobserved dependency, source-access, Spark or training error.
+The earlier exit-status-only Colab report did not establish its root cause.
+Subsequent supplied errors confirmed missing ensurepip and the expansion ceiling
+(see below and Issue #7). No private runtime logs or live Colab session were
+accessed by Codex. Diagnostics preserve the actual cause of future failures.
 
 The notebook catches repository setup, Drive mounting and pipeline errors in one
 place. It displays the underlying exception, failed phase and final relevant
@@ -187,7 +197,7 @@ lines from `bootstrap.log`, `runtime.log`, `worker.log` and the active run's
 credential fields are redacted. It finishes with `pipeline_succeeded = False`
 and an explicit **FAILED** status when work stops; a completed notebook cell
 alone does not mean the pipeline succeeded. Successful runs still display their
-report. The diagnostics PR is selected automatically before merge; after that
+report. This fix branch is selected automatically before merge; after that
 branch is deleted the notebook selects main, avoiding the older automation branch.
 
 `failure.json` contains an independently readable error and instruction, including
@@ -232,20 +242,17 @@ not a usable default there. Colab is detected using `/content` with
 `MMDS_COLAB_RUNTIME` marker is also inherited by worker processes. An installed
 `google.colab` package alone does not select Colab mode.
 
-Colab bootstrap uses `sys.executable -m pip`, ignores previously failed workspace
-venvs, and logs the selected interpreter and mode. It probes installed package
-versions on each invocation, installs only if pins are missing/mismatched, and
-refreshes editable project metadata only if its location/pyproject hash changed.
-No `--force-reinstall` or unconditional upgrade is used. A successful cache stamp
-is written only after dependency checks and actual fresh-process imports pass.
-The verified pins continue to support Python 3.11–3.13; they were not loosened to
-work around missing ensurepip.
+Issue #7 additionally confirmed global dependency conflicts caused by the earlier
+runtime installs. The bootstrap now uses runtime pip **targeting a pip-free isolated
+venv**, preserving the no-ensurepip guarantee. Old failed `venv-*` directories are
+ignored in Colab; new `colab-venv-*` environments are checked/reused or rebuilt if
+incomplete. Required pins remain unchanged and Python 3.11–3.13 are tested.
 
-Colab's unrelated global packages are not included in the MMDS dependency check:
-the pinned closure, its active dependency requirements and model-library imports
-are verified explicitly. The notebook kernel may retain earlier module imports,
-but the pipeline never reuses those for model execution: the worker and Spark
-Python processes use the selected interpreter, with the checkout on PYTHONPATH.
+Installed metadata is probed each time; matching pins skip installation. Editable
+project metadata refreshes only when necessary. A success stamp is written after
+fresh imports and full isolated pip check. No force reinstall, global conflict
+repair or uninspected get-pip script is used. The notebook kernel can retain its
+existing imports because worker and Spark children use the selected interpreter.
 
 Other cloud environments retain venv isolation. Existing venvs must have the
 correct Python version, isolated prefix and working pip. Incomplete/broken venv
@@ -258,4 +265,5 @@ versions can correctly produce a new run key.
 
 Tests simulate missing ensurepip and execute real child-process import and
 idempotence checks in Codex Cloud/GitHub CI. They are not actual hosted Colab
-execution, Drive integration, dataset acquisition or real-data training results.
+execution or Drive integration. Real dataset validation is a separate bounded
+GitHub-hosted CI job, with no real model training. See [Issue #7 evidence](issue-7.md).

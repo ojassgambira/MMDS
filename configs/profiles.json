@@ -1,5 +1,5 @@
 {
   "small": {"max_rows": 10000, "max_input_bytes": 50000000, "partitions": 2, "driver_memory": "1g", "max_cutoffs": 3},
-  "medium": {"max_rows": 300000, "max_input_bytes": 500000000, "partitions": 4, "driver_memory": "2g", "max_cutoffs": 5},
+  "medium": {"max_rows": 300000, "max_input_bytes": 750000000, "partitions": 4, "driver_memory": "2g", "max_cutoffs": 5},
   "large": {"max_rows": 2000000, "max_input_bytes": 1000000000, "partitions": 16, "driver_memory": "4g", "max_cutoffs": 10}
 }

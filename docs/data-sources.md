@@ -37,3 +37,17 @@ Use pinned upstream commits and their schema configuration. Accounts are nodes,
 transactions are events; alerts and SAR memberships are synthetic scenario labels,
 not proven real-world illicit behavior. Raw tx logs and converted transactions
 have different schemas. No simulator outputs were obtained in Phase 1.
+
+## Original release metadata verified 2026-10-15
+
+The publisher's public dataset API (`https://www.kaggle.com/api/v1/datasets/view/ellipticco/elliptic-data-set`)
+returned version 1, last updated 2019-07-31, totalBytes 697,459,499 and license
+“Attribution-NonCommercial-NoDerivatives 4.0 International (CC BY-NC-ND 4.0)”.
+PyG's upstream `torch_geometric/datasets/elliptic.py` identifies
+`https://data.pyg.org/datasets/elliptic` as its download source. Three bounded
+HTTP Range inspections of that mirror confirmed the original filenames and ZIP
+member sizes; see [measurements and execution boundaries](issue-7.md). Metadata
+inspection establishes neither publisher signatures nor successful model training.
+Use the release for the authorized private noncommercial project; do not publish
+raw/derived dataset files in GitHub artifacts. The CI validation publishes only
+aggregate audits, timings and statuses.

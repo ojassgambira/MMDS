@@ -3,19 +3,24 @@ import os
 from pathlib import Path
 import tempfile
 
-from .data.acquire import FILES, outside_repo
+from .data.acquire import (FILES, outside_repo, MAX_DOWNLOAD_BYTES, MAX_EXPANDED_BYTES,
+                           STREAM_SECONDS, validate_limits)
 
 
 def validate_config(config: dict) -> dict:
     if not isinstance(config, dict):
         raise ValueError("configuration must be a JSON object")
     allowed = {"source", "data_mode", "sample_per_step", "train_end", "validation_end",
-               "seed", "master", "input_directory"}
+               "seed", "master", "input_directory", "max_download_bytes",
+               "max_expanded_bytes", "acquisition_seconds"}
     if set(config) - allowed:
         raise ValueError(f"unknown configuration keys: {sorted(set(config) - allowed)}")
     config = {"source": "pyg", "data_mode": "full", "sample_per_step": 200,
               "train_end": 34, "validation_end": 39, "seed": 0,
-              "master": "local[2]", **config}
+              "master": "local[2]", "max_download_bytes": MAX_DOWNLOAD_BYTES,
+              "max_expanded_bytes": MAX_EXPANDED_BYTES, "acquisition_seconds": STREAM_SECONDS, **config}
+    validate_limits(config["max_download_bytes"], config["max_expanded_bytes"],
+                    config["acquisition_seconds"])
     if config["source"] not in {"pyg", "existing", "generated_test_fixture"}:
         raise ValueError("source must be pyg, existing, or generated_test_fixture")
     if config["data_mode"] not in {"full", "sample"} or config["master"] != "local[2]":

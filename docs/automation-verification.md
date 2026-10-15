@@ -143,3 +143,23 @@ seconds, including actual child-process imports and idempotent second preparatio
 under simulated Colab mode. Ruff and the installed environment's pip check passed.
 The PR's Python 3.11/3.12/3.13 checks are the committed-source compatibility record.
 These checks do not establish successful execution in the user's hosted Colab.
+
+## Issue #7: extraction ceiling and dependency conflicts
+
+The user's supplied acquisition trace confirms the old expanded-byte ceiling is
+too small. Three actual HTTP 206 ZIP metadata checks measured 697,459,499 expanded
+bytes and 153,218,212 ZIP bytes, without downloading CSV bodies in Codex Cloud.
+Kaggle's public API independently confirmed original release version 1, the same
+expanded total and CC BY-NC-ND 4.0. See [Issue #7 measurements and results](issue-7.md).
+
+The current Colab bootstrap supersedes the earlier global-runtime installation:
+runtime pip now targets an isolated pip-free environment created with
+`with_pip=False`. Global packages are preserved and their real pip check status is
+reported. Full isolated pip check/imports are mandatory. This retains the
+no-ensurepip guarantee; it does not silently declare existing global conflicts
+resolved. Dependency pins remain tested on Python 3.11–3.13.
+
+Real release validation is now a separate GitHub-hosted bounded job; only its
+actual report can establish acquisition/sample success. Generated fixture metrics
+are never presented as real Bitcoin fraud model results. Colab/Drive execution
+remains external and unverified by these cloud shell/CI simulations.

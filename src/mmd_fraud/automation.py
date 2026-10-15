@@ -12,7 +12,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from mmd_fraud.data.acquire import FILES, SOURCE, acquire, outside_repo, sha256
+from mmd_fraud.data.acquire import FILES, acquire, outside_repo, sha256, verify_acquisition
 from mmd_fraud.cloud_config import validate_config, validate_paths
 from mmd_fraud.diagnostics import record_failure, redact, tail
 from mmd_fraud.runtime import is_colab
@@ -72,6 +72,10 @@ def report(directory: Path, state: dict) -> None:
              "| --- | ---: | --- |"]
     for name, stage in state["stages"].items():
         lines.append(f"| {name} | {stage['seconds']:.3f} | hash-verified |")
+    if state.get("acquisition"):
+        item = state["acquisition"]
+        lines.append(f"| acquisition + integrity verification | {item['seconds']:.3f} | "
+                     f"{'private cache' if item['cached'] else 'new acquisition'} |")
     if state.get("provenance"):
         lines += ["", f"Source: `{state['provenance']['source']}`."]
         if "elapsed_seconds" in state["provenance"]:
@@ -139,8 +143,8 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
     identity["code_hashes"] = {str(p.relative_to(repo)): sha256(p) for p in sorted(code)}
     if source_mode != "pyg":
         raw = outside_repo(Path(config["input_directory"]))
-        if sum((raw / n).stat().st_size for n in FILES) > 500000000:
-            raise ValueError("provided source exceeds 500 MB budget")
+        if sum((raw / n).stat().st_size for n in FILES) > config["max_expanded_bytes"]:
+            raise ValueError("provided source exceeds configured expanded byte budget")
         identity["provided_inputs"] = {n: sha256(raw / n) for n in FILES}
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()[:20]
     directory = workspace / "runs" / key
@@ -239,7 +243,9 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
             state["tests"] = "skipped explicitly by caller; development integration only"
         if source_mode == "pyg":
             state["active_stage"] = "acquisition"
+            acquisition_started = time.monotonic()
             raw = workspace / "raw" / "elliptic"
+            cached = raw.exists()
             raw_remote = storage / "raw" / "elliptic" if storage else None
             if not raw.exists() and raw_remote and raw_remote.exists():
                 shutil.copytree(raw_remote, raw)
@@ -247,14 +253,12 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
                 if runtime == "codex_cloud":
                     raise RuntimeError("Dataset downloads from Codex Cloud are disabled. "
                                        "Run the same workflow in Colab, or provide authorized CSVs.")
-                acquire(raw)
-            provenance = json.loads((raw / "acquisition.json").read_text())
-            if provenance.get("source") != SOURCE:
-                raise ValueError("unexpected source provenance")
-            records = {r["file"]: r for r in provenance["files"]}
-            if set(records) != set(FILES) or any(
-                    sha256(raw / n) != records[n]["sha256"] for n in FILES):
-                raise ValueError("raw input hashes mismatch")
+                acquire(raw, config["max_download_bytes"], config["max_expanded_bytes"],
+                        config["acquisition_seconds"])
+            provenance = verify_acquisition(raw, config["max_download_bytes"],
+                                            config["max_expanded_bytes"])
+            state["acquisition"] = {"seconds": time.monotonic() - acquisition_started,
+                                    "cached": cached or bool(raw_remote and raw_remote.exists())}
             if raw_remote:
                 state["active_stage"] = "storage"
                 archive(raw, raw_remote)
@@ -271,7 +275,8 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
         if config.get("data_mode") == "sample":
             from mmd_fraud.data.sample import sample_elliptic
             stage("sample", lambda target: sample_elliptic(
-                raw, target, per_step=config.get("sample_per_step", 200)))
+                raw, target, per_step=config.get("sample_per_step", 200),
+                max_bytes=config["max_expanded_bytes"]))
             audit = json.loads((directory / "sample/sample.json").read_text())
             if source_mode != "generated_test_fixture" and (
                     audit["source_nodes"] != 203769 or audit["source_edges_raw"] != 234355
@@ -281,6 +286,7 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
             input_dir = directory / "sample"
         profile_name = "small" if config.get("data_mode") == "sample" else "medium"
         profile = json.loads((repo / "configs/profiles.json").read_text())[profile_name]
+        profile["max_input_bytes"] = min(profile["max_input_bytes"], config["max_expanded_bytes"])
         def preprocess(target):
             from mmd_fraud.spark.pipeline import run
             # Existing pipeline preserves source arrays for audit, never model predictors.
