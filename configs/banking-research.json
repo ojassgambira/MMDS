@@ -1,0 +1,9 @@
+{
+  "accounts": 500,
+  "daily_events": 600,
+  "seeds": [
+    0,
+    1,
+    2
+  ]
+}

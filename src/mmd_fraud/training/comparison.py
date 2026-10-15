@@ -58,7 +58,8 @@ def validation_threshold(y, score, fpr_cap=.05):
 
 def train_comparison(feature_path: Path, output: Path, cache: Path,
                      train_end=34, validation_end=39, seed=0, *, families=None,
-                     preserve_baseline=False, export_scores=False) -> dict:
+                     preserve_baseline=False, export_scores=False, cutoff_offset=1,
+                     source_policy="93 publisher-local numeric attributes; 72 neighbor aggregates excluded") -> dict:
     families = FAMILIES if families is None else families
     dataset = pq.ParquetDataset(feature_path)
     if sum(pq.read_metadata(p).num_rows for p in dataset.files) > 300000:
@@ -67,7 +68,7 @@ def train_comparison(feature_path: Path, output: Path, cache: Path,
     table = dataset.read(columns=['entity_id', 'time_step', 'label', 'feature_cutoff_exclusive', *columns])
     # Use Arrow/NumPy arrays: no 203K x 123 dictionary materialization.
     metadata = table.select(['entity_id', 'time_step', 'label', 'feature_cutoff_exclusive']).to_pylist()
-    splits = chronological_split(metadata, train_end, validation_end)
+    splits = chronological_split(metadata, train_end, validation_end, cutoff_offset)
     order = sorted(range(len(metadata)), key=lambda i: (metadata[i]['time_step'], metadata[i]['entity_id']))
     positions = {name: np.array([i for i in order if metadata[i]['label'] != 'unknown' and
                  ('train' if metadata[i]['time_step'] <= train_end else
@@ -80,7 +81,7 @@ def train_comparison(feature_path: Path, output: Path, cache: Path,
     identity = {'inputs': {str(Path(p).name): sha256(Path(p)) for p in dataset.files},
                 'families': families, 'preserve_baseline': preserve_baseline, 'candidates': CANDIDATES, 'seed': seed,
                 'train_end': train_end, 'validation_end': validation_end,
-                'code': sha256(Path(__file__))}
+                'cutoff_offset': cutoff_offset, 'source_policy': source_policy, 'code': sha256(Path(__file__))}
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     cache = cache / key
     cache.mkdir(parents=True, exist_ok=True)
@@ -89,7 +90,7 @@ def train_comparison(feature_path: Path, output: Path, cache: Path,
               'unknown_excluded': splits['unknown_excluded'],
               'split_counts': {name: {'rows': len(v), 'illicit': int(v.sum())} for name, v in y.items()},
               'threshold_policy': 'maximize validation F1 under validation FPR <= 0.05; no test tuning',
-              'source_policy': '93 publisher-local numeric attributes; 72 neighbor aggregates excluded',
+              'source_policy': source_policy, 'cutoff_offset': cutoff_offset,
               'families': {}, 'selected_family': None, 'search_identity': key}
     winners = {}
     with threadpool_limits(limits=2):

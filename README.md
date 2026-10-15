@@ -49,3 +49,8 @@ Real-data success must be established separately from generated fixture tests.
 Phase 4 adds bounded graph mining, causal rolling features and paired research
 evaluation to unattended GitHub training. See the [fixed research protocol](docs/phase4-research.md)
 for features, ablations, leakage assumptions, generated reports and resource limits.
+
+Phase 5 adds [independent synthetic banking research](docs/phase5-banking.md),
+AMLSim-compatible converted CSV validation and next-day account SAR forecasting.
+It runs automatically in the free **Synthetic banking research** workflow and
+keeps synthetic banking evidence separate from real Elliptic results.
