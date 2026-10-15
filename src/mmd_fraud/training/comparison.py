@@ -57,11 +57,13 @@ def validation_threshold(y, score, fpr_cap=.05):
 
 
 def train_comparison(feature_path: Path, output: Path, cache: Path,
-                     train_end=34, validation_end=39, seed=0) -> dict:
+                     train_end=34, validation_end=39, seed=0, *, families=None,
+                     preserve_baseline=False, export_scores=False) -> dict:
+    families = FAMILIES if families is None else families
     dataset = pq.ParquetDataset(feature_path)
     if sum(pq.read_metadata(p).num_rows for p in dataset.files) > 300000:
         raise ValueError('comparison exceeds bounded release row count')
-    columns = list(dict.fromkeys(c for names in FAMILIES.values() for c in names))
+    columns = list(dict.fromkeys(c for names in families.values() for c in names))
     table = dataset.read(columns=['entity_id', 'time_step', 'label', 'feature_cutoff_exclusive', *columns])
     # Use Arrow/NumPy arrays: no 203K x 123 dictionary materialization.
     metadata = table.select(['entity_id', 'time_step', 'label', 'feature_cutoff_exclusive']).to_pylist()
@@ -76,7 +78,7 @@ def train_comparison(feature_path: Path, output: Path, cache: Path,
     if not all(np.isfinite(values).all() for values in features.values()):
         raise ValueError('nonfinite comparison features')
     identity = {'inputs': {str(Path(p).name): sha256(Path(p)) for p in dataset.files},
-                'families': FAMILIES, 'candidates': CANDIDATES, 'seed': seed,
+                'families': families, 'preserve_baseline': preserve_baseline, 'candidates': CANDIDATES, 'seed': seed,
                 'train_end': train_end, 'validation_end': validation_end,
                 'code': sha256(Path(__file__))}
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
@@ -91,10 +93,11 @@ def train_comparison(feature_path: Path, output: Path, cache: Path,
               'families': {}, 'selected_family': None, 'search_identity': key}
     winners = {}
     with threadpool_limits(limits=2):
-        for family, names in FAMILIES.items():
+        for family, names in families.items():
             x = {name: np.column_stack([features[c][idx] for c in names]) for name, idx in positions.items()}
             trials = {}
-            for label in CANDIDATES:
+            candidates = ('hist_unweighted',) if preserve_baseline and family == 'transaction_only' else CANDIDATES
+            for label in candidates:
                 checkpoint = cache / f'{family}-{label}'
                 model_file = checkpoint.with_suffix('.joblib')
                 record_file = checkpoint.with_suffix('.json')
@@ -129,7 +132,7 @@ def train_comparison(feature_path: Path, output: Path, cache: Path,
                     pending.write_text(json.dumps(record, indent=2) + '\n')
                     pending.replace(record_file)
                 trials[label] = record
-            chosen = max(CANDIDATES, key=lambda n: trials[n]['validation']['pr_auc_average_precision'])
+            chosen = max(candidates, key=lambda n: trials[n]['validation']['pr_auc_average_precision'])
             model_file = cache / f'{family}-{chosen}.joblib'
             model = joblib.load(model_file)
             score = model.predict_proba(x['validation'])[:, 1]
@@ -141,13 +144,17 @@ def train_comparison(feature_path: Path, output: Path, cache: Path,
             winners[family] = model
         # Freeze the global choice before any test prediction. All four predeclared
         # family winners are then evaluated for the requested comparison.
-        result['selected_family'] = max(FAMILIES, key=lambda n:
+        result['selected_family'] = max(families, key=lambda n:
             result['families'][n]['validation']['pr_auc_average_precision'])
         (output / 'selection.json').write_text(json.dumps(result, indent=2) + '\n')
-        for family, names in FAMILIES.items():
+        for family, names in families.items():
             x_test = np.column_stack([features[c][positions['test']] for c in names])
             score = winners[family].predict_proba(x_test)[:, 1]
             item = result['families'][family]
+            if export_scores:
+                np.savez_compressed(output / f'{family}-private-scores.npz',
+                                    score=score, y=y['test'],
+                                    step=np.array([metadata[i]['time_step'] for i in positions['test']]))
             item['test'] = evaluate(y['test'], score, item['threshold'])
             item['test_fixed'] = evaluate(y['test'], score)
             joblib.dump(winners[family], output / f'{family}.joblib')

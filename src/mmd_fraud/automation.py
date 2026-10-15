@@ -64,7 +64,8 @@ def report(directory: Path, state: dict) -> None:
              f"Dataset kind: `{state['dataset_kind']}`", f"Runtime: `{state['runtime']}`",
              f"Code commit: `{state['git_commit']}`", "",
              "This is a measured run, not a claim of Colab verification from another runtime.",
-             "No anonymous source features or labels enter graph predictors. Unknown labels",
+             "Anonymous publisher neighborhood aggregates are excluded. Historical label context",
+             "uses only strictly earlier training labels when research is enabled. Unknown labels",
              "are excluded from supervised fitting and evaluation. Features are available",
              "after each source step completes; same-step information is included. The label",
              "availability assumption is offline; live availability is unverified.", "",
@@ -363,6 +364,24 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
                                  directory / "comparison-trials", train_end, validation_end,
                                  config["seed"])
             stage("comparison", comparison)
+        if config["research"]:
+            def research_features(target):
+                from mmd_fraud.spark.research import build_research
+                target.mkdir()
+                audit = build_research(directory / "experiment_features/transactions",
+                                       directory / "preprocess/edges", target / "transactions.parquet", train_end)
+                write_json(target / "audit.json", audit)
+            stage("research_features", research_features)
+            def research(target):
+                from mmd_fraud.spark.research import RESEARCH_FAMILIES
+                from mmd_fraud.training.comparison import train_comparison
+                from mmd_fraud.training.research import research_report
+                train_comparison(directory / "research_features/transactions.parquet", target,
+                                 directory / "research-trials", train_end, validation_end,
+                                 config["seed"], families=RESEARCH_FAMILIES,
+                                 preserve_baseline=True, export_scores=True)
+                research_report(target, json.loads((directory / "research_features/audit.json").read_text()))
+            stage("research", research)
         state["status"] = "success"
         state["active_stage"] = "complete"
         save()

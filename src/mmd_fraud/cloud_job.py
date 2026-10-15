@@ -121,7 +121,8 @@ def diagnostics(workspace: Path, error: Exception | None) -> dict:
 
 def publish_evidence(workspace: Path, evidence: Path, *, review=None, error=None):
     evidence.mkdir(parents=True, exist_ok=True)
-    allowed = {'training-summary.json', 'training-report.md', 'training-evidence-manifest.json'}
+    allowed = {'training-summary.json', 'training-report.md', 'training-evidence-manifest.json',
+               'research-report.md', 'research-results.png'}
     if any(p.is_symlink() or p.name not in allowed for p in evidence.iterdir()):
         raise ValueError('evidence directory contains unexpected files; refusing publication')
     summary = {'status': 'failed', 'runtime': 'github_ci', 'real_training_verified': False,
@@ -166,6 +167,13 @@ def publish_evidence(workspace: Path, evidence: Path, *, review=None, error=None
                         or comparison['unknown_excluded'] != m['unknown_excluded']):
                     raise ValueError('comparison population differs from baseline')
                 summary['comparison'] = comparison
+            if state['config'].get('research'):
+                if not {'research_features', 'research'} <= set(manifest):
+                    raise ValueError('research lacks verified stages')
+                research = json.loads((directory / 'research/research.json').read_text())
+                if research['split_counts'] != m['split_counts']:
+                    raise ValueError('research split population differs from baseline')
+                summary['research'] = research
             summary['status'] = 'success'
             summary['real_training_verified'] = True
             summary['diagnostics'] = None
@@ -174,6 +182,7 @@ def publish_evidence(workspace: Path, evidence: Path, *, review=None, error=None
         summary['real_training_verified'] = False
         summary.pop('metrics', None)
         summary.pop('comparison', None)
+        summary.pop('research', None)
         summary['evidence_error_type'] = type(exc).__name__
     write_json(evidence / 'training-summary.json', summary)
     lines = ['# MMDS unattended cloud training', '', f"Status: **{summary['status']}**",
@@ -220,6 +229,8 @@ def publish_evidence(workspace: Path, evidence: Path, *, review=None, error=None
                          f" | {item['threshold']:.6f} |")
         lines += ['', 'Fixed-0.5 comparison metrics, validation trials, source hashes and all feature',
                   'names are retained in training-summary.json. Test metrics never select a family.']
+    if summary.get('research'):
+        lines += ['', (directory / 'research/research-report.md').read_text()]
     lines += ['', '## Stage seconds', '']
     for name, item in summary.get('stage_manifests', {}).items():
         lines.append(f"- {name}: {item['seconds']:.3f}")
@@ -227,6 +238,12 @@ def publish_evidence(workspace: Path, evidence: Path, *, review=None, error=None
               'aggregate metrics and artifact hashes/sizes, not raw or derived transaction records.',
               'Ephemeral checkpoints resume within a retained workspace, not across fresh hosted jobs.']
     (evidence / 'training-report.md').write_text('\n'.join(lines) + '\n')
+    for name in ('research-report.md', 'research-results.png'):
+        destination = evidence / name
+        if summary.get('research'):
+            destination.write_bytes((directory / 'research' / name).read_bytes())
+        else:
+            destination.unlink(missing_ok=True)
     public_files = {p.name: sha256(p)
                     for p in evidence.iterdir() if p.name != 'training-evidence-manifest.json'}
     write_json(evidence / 'training-evidence-manifest.json', {'sha256': public_files})
@@ -252,7 +269,7 @@ def main(argv=None):
         if shutil.disk_usage(workspace).free < 6_000_000_000:
             raise ValueError('at least 6 GB free runtime disk required before training')
         review = review_release()
-        config = {'source': 'pyg', 'data_mode': args.data_mode, 'experiments': True}
+        config = {'source': 'pyg', 'data_mode': args.data_mode, 'experiments': True, 'research': True}
         write_json(workspace / 'job-config.json', config)
         run_worker(Path(__file__).resolve().parents[2], workspace, workspace / 'job-config.json')
     except Exception as exc:
