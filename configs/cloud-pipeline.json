@@ -8,5 +8,6 @@
   "master": "local[2]",
   "max_download_bytes": 200000000,
   "max_expanded_bytes": 750000000,
-  "acquisition_seconds": 600
+  "acquisition_seconds": 600,
+  "experiments": false
 }

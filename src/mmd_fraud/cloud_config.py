@@ -12,13 +12,15 @@ def validate_config(config: dict) -> dict:
         raise ValueError("configuration must be a JSON object")
     allowed = {"source", "data_mode", "sample_per_step", "train_end", "validation_end",
                "seed", "master", "input_directory", "max_download_bytes",
-               "max_expanded_bytes", "acquisition_seconds"}
+               "max_expanded_bytes", "acquisition_seconds", "experiments"}
     if set(config) - allowed:
         raise ValueError(f"unknown configuration keys: {sorted(set(config) - allowed)}")
     config = {"source": "pyg", "data_mode": "full", "sample_per_step": 200,
               "train_end": 34, "validation_end": 39, "seed": 0,
-              "master": "local[2]", "max_download_bytes": MAX_DOWNLOAD_BYTES,
+              "master": "local[2]", "experiments": False, "max_download_bytes": MAX_DOWNLOAD_BYTES,
               "max_expanded_bytes": MAX_EXPANDED_BYTES, "acquisition_seconds": STREAM_SECONDS, **config}
+    if type(config["experiments"]) is not bool:
+        raise ValueError("experiments must be boolean")
     validate_limits(config["max_download_bytes"], config["max_expanded_bytes"],
                     config["acquisition_seconds"])
     if config["source"] not in {"pyg", "existing", "generated_test_fixture"}:

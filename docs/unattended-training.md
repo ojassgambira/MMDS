@@ -128,3 +128,10 @@ code edits, log copying or Colab debugging are required by the GitHub workflow.
 Real model metrics are claimed only in a completed workflow's aggregate report.
 The PR records measured results and CI links after actual execution. Code and
 synthetic test success alone do not establish real training or Colab execution.
+
+## Feature-family experiments
+
+The hosted job now also runs [the predeclared feature comparison](feature-comparison.md):
+transaction-only, graph mining, temporal context and combined predictors, with
+training-only imbalance handling, validation-only model/threshold tuning and
+separate test metrics. The original three baselines remain in the report.

@@ -146,6 +146,8 @@ def publish_evidence(workspace: Path, evidence: Path, *, review=None, error=None
                 {'path': name, 'sha256': digest, 'bytes': (directory / stage / name).stat().st_size}
                 for name, digest in info['hashes'].items()]}
         summary['stage_manifests'] = manifest
+        summary['source_files'] = [{k: r[k] for k in ('file', 'bytes', 'sha256', 'archive_sha256')}
+                                   for r in state.get('provenance', {}).get('files', [])]
         if (directory / 'preprocess/run.json').exists():
             summary['validation'] = json.loads((directory / 'preprocess/run.json').read_text())['validation']
         if state['status'] == 'success' and error is None:
@@ -156,6 +158,14 @@ def publish_evidence(workspace: Path, evidence: Path, *, review=None, error=None
             if (m['unknown_excluded'] + sum(c['rows'] for c in m['split_counts'].values())
                     != summary['validation']['nodes']):
                 raise ValueError('training row counts differ from validated graph')
+            if state['config'].get('experiments'):
+                if not {'experiment_features', 'comparison'} <= set(manifest):
+                    raise ValueError('comparison lacks verified stages')
+                comparison = json.loads((directory / 'comparison/comparison.json').read_text())
+                if (comparison['split_counts'] != m['split_counts']
+                        or comparison['unknown_excluded'] != m['unknown_excluded']):
+                    raise ValueError('comparison population differs from baseline')
+                summary['comparison'] = comparison
             summary['status'] = 'success'
             summary['real_training_verified'] = True
             summary['diagnostics'] = None
@@ -163,6 +173,7 @@ def publish_evidence(workspace: Path, evidence: Path, *, review=None, error=None
         summary['status'] = 'failed'
         summary['real_training_verified'] = False
         summary.pop('metrics', None)
+        summary.pop('comparison', None)
         summary['evidence_error_type'] = type(exc).__name__
     write_json(evidence / 'training-summary.json', summary)
     lines = ['# MMDS unattended cloud training', '', f"Status: **{summary['status']}**",
@@ -189,6 +200,26 @@ def publish_evidence(workspace: Path, evidence: Path, *, review=None, error=None
     else:
         lines += ['No successful training/metrics claimed.', '```json',
                   json.dumps(summary['diagnostics'], indent=2), '```']
+    if summary.get('comparison'):
+        comparison = summary['comparison']
+        lines += ['', '## Predeclared feature comparison', '',
+                  '93 publisher-local attributes only; 72 anonymous neighborhood aggregates excluded.',
+                  'Local attribute live availability is a publisher assumption, not independently verified.',
+                  'Temporal baselines use strictly previous-step population statistics, without labels.',
+                  'Twenty fixed candidates; selection uses validation AP only. Each family threshold',
+                  'maximizes validation F1 under a 5% validation FPR cap; test FPR may exceed it.',
+                  f"Selected family: **{comparison['selected_family']}**", '',
+                  '| Family | Candidate | Val AP | Test AP | F1 | Recall | FPR | Threshold |',
+                  '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |']
+        for family, item in comparison['families'].items():
+            m = item['test']
+            lines.append(f"| {family} | {item['candidate']} | "
+                         f"{item['validation']['pr_auc_average_precision']:.6f} | " +
+                         ' | '.join(f"{m[k]:.6f}" for k in
+                         ('pr_auc_average_precision', 'f1', 'recall', 'false_positive_rate')) +
+                         f" | {item['threshold']:.6f} |")
+        lines += ['', 'Fixed-0.5 comparison metrics, validation trials, source hashes and all feature',
+                  'names are retained in training-summary.json. Test metrics never select a family.']
     lines += ['', '## Stage seconds', '']
     for name, item in summary.get('stage_manifests', {}).items():
         lines.append(f"- {name}: {item['seconds']:.3f}")
@@ -221,7 +252,7 @@ def main(argv=None):
         if shutil.disk_usage(workspace).free < 6_000_000_000:
             raise ValueError('at least 6 GB free runtime disk required before training')
         review = review_release()
-        config = {'source': 'pyg', 'data_mode': args.data_mode}
+        config = {'source': 'pyg', 'data_mode': args.data_mode, 'experiments': True}
         write_json(workspace / 'job-config.json', config)
         run_worker(Path(__file__).resolve().parents[2], workspace, workspace / 'job-config.json')
     except Exception as exc:

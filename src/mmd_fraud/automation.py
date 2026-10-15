@@ -333,6 +333,36 @@ def run_workflow(repo: Path, workspace: Path, config: dict, storage: Path | None
                   config.get("train_end", 34), config.get("validation_end", 39),
                   config.get("seed", 0))
         stage("models", models)
+        if config["experiments"]:
+            def expanded(target):
+                from mmd_fraud.spark.experiments import experiment_features, FAMILIES
+                from mmd_fraud.spark.pipeline import session
+                from pyspark.sql import functions as F
+                target.mkdir()
+                spark = session(profile, directory / "experiment-spark-checkpoints")
+                try:
+                    nodes = spark.read.parquet(str(directory / "preprocess/nodes"))
+                    edges = spark.read.parquet(str(directory / "preprocess/edges"))
+                    frame = experiment_features(nodes, edges)
+                    frame.write.mode("errorifexists").parquet(str(target / "transactions"))
+                    checked = spark.read.parquet(str(target / "transactions"))
+                    count = checked.count()
+                    if count != nodes.count() or checked.select("entity_id").distinct().count() != count:
+                        raise ValueError("experiment features changed transaction identities")
+                    names = list(dict.fromkeys(c for v in FAMILIES.values() for c in v))
+                    bad = [F.col(c).isNull() | F.isnan(c) | (F.abs(F.col(c)) == float('inf')) for c in names]
+                    if checked.filter(F.exists(F.array(*bad), lambda x: x)).limit(1).count():
+                        raise ValueError("invalid experiment features")
+                    write_json(target / "validation.json", {"rows": count, "schema": "comparison_v1"})
+                finally:
+                    spark.stop()
+            stage("experiment_features", expanded)
+            def comparison(target):
+                from mmd_fraud.training.comparison import train_comparison
+                train_comparison(directory / "experiment_features/transactions", target,
+                                 directory / "comparison-trials", train_end, validation_end,
+                                 config["seed"])
+            stage("comparison", comparison)
         state["status"] = "success"
         state["active_stage"] = "complete"
         save()
