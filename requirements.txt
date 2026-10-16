@@ -1,0 +1,2 @@
+# Streamlit Community Cloud reads this file; lightweight dashboard runtime only.
+-r requirements-dashboard.lock

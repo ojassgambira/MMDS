@@ -1,0 +1,73 @@
+{
+  "configuration": {
+    "runtime": "codex_cloud",
+    "master": "local[2]",
+    "driver_memory": "1g",
+    "shuffle_partitions": "2",
+    "default_parallelism": 2,
+    "spark": "4.0.1",
+    "python": "3.12.14",
+    "java": "openjdk version \"21.0.12.1\" 2026-08-18",
+    "cpu_count_visible": 3,
+    "machines": 1,
+    "distributed_multi_worker_verified": false,
+    "order": "Bitcoin sizes ascending, then banking sizes ascending; first measured run includes cold work",
+    "repetitions": 1,
+    "scope": "CSV validation + graph statistics + Parquet write/read/count; excludes source generation and Spark startup",
+    "versions": {
+      "numpy": "2.2.6",
+      "pyarrow": "20.0.0",
+      "pyspark": "4.0.1"
+    }
+  },
+  "measurements": [
+    {
+      "domain": "bitcoin_generated_fixture",
+      "nodes": 100,
+      "events": 99,
+      "input_bytes": 68560,
+      "seconds": 15.465868892999993,
+      "output_rows": 100
+    },
+    {
+      "domain": "bitcoin_generated_fixture",
+      "nodes": 500,
+      "events": 499,
+      "input_bytes": 344486,
+      "seconds": 8.943667763000008,
+      "output_rows": 500
+    },
+    {
+      "domain": "bitcoin_generated_fixture",
+      "nodes": 1000,
+      "events": 999,
+      "input_bytes": 689394,
+      "seconds": 8.19743788300002,
+      "output_rows": 1000
+    },
+    {
+      "domain": "independent_synthetic_banking",
+      "nodes": 100,
+      "events": 8600,
+      "input_bytes": 596766,
+      "seconds": 2.1820793509999703,
+      "output_rows": 100
+    },
+    {
+      "domain": "independent_synthetic_banking",
+      "nodes": 500,
+      "events": 28600,
+      "input_bytes": 1993351,
+      "seconds": 2.3820068920000494,
+      "output_rows": 500
+    },
+    {
+      "domain": "independent_synthetic_banking",
+      "nodes": 1000,
+      "events": 53600,
+      "input_bytes": 3739327,
+      "seconds": 2.720581358000004,
+      "output_rows": 1000
+    }
+  ]
+}
