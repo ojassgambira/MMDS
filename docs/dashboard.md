@@ -94,3 +94,11 @@ This is a manifest assertion, not independent source authentication. IDs are
 visible to dashboard viewers, so only provision a subgraph whose display is
 already authorized for that host. No such private graph is provided or claimed
 verified as real in this PR. Raw/derived transaction records stay outside Git.
+
+## Reproduce report figures
+
+In the full managed cloud development environment, run
+`python dashboard/render_report_figures.py`. This renders the three report PNGs
+from hash-verified aggregate snapshots without downloading datasets or rerunning
+training. Matplotlib is a development/report dependency; the lightweight hosted
+dashboard only reads the resulting images.

@@ -98,7 +98,7 @@ if page == "Overview":
                 color="Label",
                 title="Source labels: 1 illicit · 2 licit · unknown",
             ),
-            width="stretch",
+            use_container_width=True,
         )
     else:
         st.caption(
@@ -129,7 +129,7 @@ elif page == "Transaction graph":
     focus = st.selectbox("Focus node", ["All nodes", *[n["id"] for n in nodes]])
     arrows = st.checkbox("Show flow arrows (first 150 visible events)", True)
     graph, edge_count = figure(nodes, edges, day, focus, arrows)
-    st.plotly_chart(graph, width="stretch", config={"scrollZoom": True})
+    st.plotly_chart(graph, use_container_width=True, config={"scrollZoom": True})
     st.caption(
         f"{count} generated nodes before focus · {edge_count} visible directed events. Pan, zoom, hover and focus a node. Banking events can repeat; Bitcoin example nodes represent transactions."
     )
@@ -145,11 +145,12 @@ elif page == "Temporal patterns":
         y = ["licit", "illicit", "unknown"] if domain == "elliptic" else ["events", "sar_payments"]
         st.plotly_chart(
             px.line(df, x=x, y=y, markers=True, title="Observed period populations"),
-            width="stretch",
+            use_container_width=True,
         )
         if domain == "banking":
             st.plotly_chart(
-                px.area(df, x=x, y="volume", title="Synthetic payment volume"), width="stretch"
+                px.area(df, x=x, y="volume", title="Synthetic payment volume"),
+                use_container_width=True,
             )
         st.dataframe(df, hide_index=True, width="stretch")
     else:
@@ -168,7 +169,7 @@ elif page == "Temporal patterns":
                 markers=True,
                 title="Held-out AP by released step",
             ),
-            width="stretch",
+            use_container_width=True,
         )
 elif page == "Models & PR curves":
     st.subheader("Chronological model evaluation")
@@ -189,7 +190,8 @@ elif page == "Models & PR curves":
     frame = pd.DataFrame(rows)
     st.dataframe(frame, hide_index=True, width="stretch")
     st.plotly_chart(
-        px.bar(frame, x="Family", y=["Test AP", "F1", "Recall"], barmode="group"), width="stretch"
+        px.bar(frame, x="Family", y=["Test AP", "F1", "Recall"], barmode="group"),
+        use_container_width=True,
     )
     family = st.selectbox(
         "Confusion matrix model", list(families), index=list(families).index(selected)
@@ -210,7 +212,7 @@ elif page == "Models & PR curves":
             labels={"x": "Predicted", "y": "Observed"},
             title="Held-out confusion matrix",
         ),
-        width="stretch",
+        use_container_width=True,
     )
     st.caption(
         f"Operating threshold {item['test']['threshold']:.8f}, chosen on validation. The 5% validation FPR cap is not a test guarantee."
@@ -235,7 +237,7 @@ elif page == "Models & PR curves":
             yaxis_range=[0, 1],
             title="Held-out PR curves · sampled aggregate points",
         )
-        st.plotly_chart(curve, width="stretch")
+        st.plotly_chart(curve, use_container_width=True)
         st.caption(
             "Curves sample actual sklearn PR points; reported AP uses the full ranking. Curves are never reconstructed from AP."
         )
@@ -270,7 +272,7 @@ elif page == "Scalability":
                 hover_data=["nodes", "input_bytes"],
                 title="Spark ingestion + validation + account/transaction graph summaries",
             ),
-            width="stretch",
+            use_container_width=True,
         )
         st.dataframe(df, hide_index=True, width="stretch")
     else:
@@ -282,12 +284,17 @@ elif page == "Scalability":
     x = "visible_edges" if domain == "elliptic" else "events"
     st.plotly_chart(
         px.line(b, x=x, y="seconds", markers=True, title="Sparse graph prefix timings"),
-        width="stretch",
+        use_container_width=True,
     )
 else:
     st.subheader("Research methodology and conclusions")
     report = ROOT / "docs/final-research-report.md"
-    st.markdown(report.read_text() if report.exists() else "Research report is being prepared.")
+    text = report.read_text() if report.exists() else "Research report is being prepared."
+    st.markdown("\n".join(line for line in text.splitlines() if not line.startswith("![")))
+    for name in [f"{domain}-evaluation.png", "spark-processing.png"]:
+        figure = ROOT / "docs/figures" / name
+        if figure.exists():
+            st.image(str(figure))
     st.download_button(
         "Download final research report",
         report.read_text() if report.exists() else "",

@@ -102,6 +102,10 @@ Isolation Forest fits without labels; its sigmoid anomaly score is not calibrate
 fraud probability. Full per-seed matrices, thresholds, warning logs and candidate
 scores are in linked aggregate artifacts and the dashboard snapshots.
 
+![Real Elliptic evaluation, measured curves and temporal counts](figures/elliptic-evaluation.png)
+
+![Independent synthetic banking seed 0 evaluation and temporal counts](figures/banking-evaluation.png)
+
 ## Statistical comparisons
 
 Five hundred seeded paired source-period bootstrap draws compare a model with the
@@ -137,6 +141,28 @@ warm-up confound timings. These observations do not establish monotonic scaling,
 production throughput or distributed multi-worker speedup. **No multi-worker cluster
 was run.** CI separately reruns the benchmark and exports its own measured JSON;
 its hardware/runtime and timings can differ from the bundled Codex measurements.
+
+![Measured single-machine PySpark processing times](figures/spark-processing.png)
+
+## Phase 6 verification
+
+The Phase 6 source commit `d279d9b` reran real Elliptic and all three synthetic
+banking seeds in free GitHub Actions. All eight Elliptic research-family test AP
+values and all twelve supervised banking-family test AP values matched the frozen
+snapshots exactly. This instrumentation change does not establish a new model
+improvement. The dashboard now includes 23 actual measured PR curves, including
+three synthetic Isolation Forest curves, and 50 aggregate simulation days per seed.
+
+- [Real Elliptic verification](https://github.com/ojassgambira/MMDS/actions/runs/38904556561):
+  artifact SHA-256 `5c4e108c504a69ccaa534dbfe81c66bfde5490be4db9765d12ed50d47bd780b8`.
+- [Synthetic banking verification](https://github.com/ojassgambira/MMDS/actions/runs/38904556473):
+  artifact SHA-256 `d916d492acbd4da67af7db491fef4d834aa4c7207ff03421c66e54db2245745a`.
+- [Python 3.11–3.13 compatibility](https://github.com/ojassgambira/MMDS/actions/runs/38904556726):
+  102 tests per runtime, dependency checks, lint and Spark smoke tests passed.
+- [UI-only hosting and six Spark benchmarks](https://github.com/ojassgambira/MMDS/actions/runs/38904557186)
+  passed independently. Codex Cloud also passed 102 pytest tests, 102 unittest
+  tests, standalone Spark smoke, and HTTP health/root checks. Neither a public
+  deployment nor Colab execution is implied by these checks.
 
 ## Reproducibility, resource and access boundaries
 
