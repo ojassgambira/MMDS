@@ -54,3 +54,11 @@ Phase 5 adds [independent synthetic banking research](docs/phase5-banking.md),
 AMLSim-compatible converted CSV validation and next-day account SAR forecasting.
 It runs automatically in the free **Synthetic banking research** workflow and
 keeps synthetic banking evidence separate from real Elliptic results.
+
+Phase 6 provides the read-only [Streamlit research dashboard](docs/dashboard.md)
+and [final research report](docs/final-research-report.md). It includes separate
+real Elliptic and independent synthetic banking evidence, interactive illustrative
+graphs, measured PR curves, confusion matrices and honest single-machine Spark
+benchmarks. Root `requirements.txt` is the lightweight free-hosting runtime;
+training/CI continues to use `requirements-cloud.lock`. Public hosting requires
+one-time external Streamlit Community Cloud authorization; no public URL is claimed.

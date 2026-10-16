@@ -2,7 +2,9 @@ name: Unattended real-data training
 on:
   push:
     branches: [main]
+    paths-ignore: ["dashboard/**", "docs/**", ".streamlit/**"]
   pull_request:
+    paths-ignore: ["dashboard/**", "docs/**", ".streamlit/**"]
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:

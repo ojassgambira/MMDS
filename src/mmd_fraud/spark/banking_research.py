@@ -171,6 +171,9 @@ def prepare(spark, source: Path, output: Path):
     frame.write.parquet(str(output / "daily"))
     events.select("source", "target", "time_step", "amount").write.parquet(str(output / "events"))
     audit["account_days"] = frame.count()
+    audit["daily"] = [r.asDict() for r in events.groupBy("time_step").agg(
+        F.count("*").alias("events"), F.sum("amount").alias("volume"),
+        F.sum("sar").alias("sar_payments")).orderBy("time_step").collect()]
     daily.unpersist()
     return audit
 
