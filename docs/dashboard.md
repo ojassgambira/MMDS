@@ -69,9 +69,10 @@ to the same run.
 
 Refresh through `scripts/import_dashboard_evidence.py` using an already downloaded
 and digest-verified GitHub aggregate artifact. No dataset download occurs. Reimport
-both domains as required; the manifest updates all aggregate fingerprints. Dashboard
-and documentation-only commits skip dataset reacquisition, while compatibility
-and dashboard CI still validate them. Weekly/manual dataset workflows remain.
+both domains as required; the manifest updates all aggregate fingerprints. Pull requests whose entire diff is dashboard/documentation-only skip dataset
+reacquisition, while compatibility and dashboard CI still validate them. This
+Phase 6 pull request changes training exporters as well, so its full dataset
+workflows run on each update. Weekly/manual dataset workflows remain.
 
 ## Graph explorer
 
