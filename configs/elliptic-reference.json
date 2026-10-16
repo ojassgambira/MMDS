@@ -1,0 +1,32 @@
+{
+  "dataset_kind": "real_original_elliptic_release",
+  "url": "https://github.com/ojassgambira/MMDS/pull/12",
+  "workflow": "https://github.com/ojassgambira/MMDS/actions/runs/38772341025",
+  "evidence_sha256": "e75d04458aa592ccfaebe896d96721545d34df46379d8906fe97a76334016800",
+  "baseline": {
+    "precision": 0.8372641509433962,
+    "recall": 0.5581761006289309,
+    "f1": 0.6698113207547169,
+    "pr_auc_average_precision": 0.6521450349945489,
+    "false_positive_rate": 0.006541524459613196,
+    "confusion_matrix": [
+      [
+        10479,
+        69
+      ],
+      [
+        281,
+        355
+      ]
+    ],
+    "confusion_matrix_order": [
+      "licit=0",
+      "illicit=1"
+    ],
+    "rows": 11184,
+    "illicit": 636,
+    "threshold": 0.6562451357679274
+  },
+  "nodes": 203769,
+  "edges": 234355
+}

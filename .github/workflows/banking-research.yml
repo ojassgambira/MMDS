@@ -1,0 +1,89 @@
+name: Synthetic banking research
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: banking-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  banking:
+    if: github.repository == 'ojassgambira/MMDS' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SPARK_LOCAL_IP: 127.0.0.1
+      PYSPARK_PYTHON: python
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+      MMDS_PUBLIC_REPOSITORY: ${{ github.event.repository.private == false }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: python -m pip install -r requirements-cloud.lock
+      - run: python -m pip install --no-build-isolation --no-deps -e .
+      - run: python -m pip check
+      - run: python -m ruff check .
+      - name: Banking regression tests
+        run: python -m pytest -q tests/test_banking_research.py
+      - name: Three predeclared synthetic banking replicas
+        env:
+          MPLCONFIGDIR: ${{ runner.temp }}/mmds-plot-cache
+        run: |
+          mkdir -p "$RUNNER_TEMP/banking-private"
+          if ! python scripts/run_banking_job.py --workspace "$RUNNER_TEMP/banking-private" > "$RUNNER_TEMP/banking-private/execution.log" 2>&1; then
+            python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'banking-private'
+          for path in root.glob('*/seed-*/state.json'):
+              state = json.loads(path.read_text())
+              if state.get('status') == 'failed':
+                  print(json.dumps({k: state.get(k) for k in ('status', 'active_stage', 'error_type', 'frames')}))
+          print('Banking job failed; no successful simulation metrics published. Full logs retained privately until cleanup.')
+          PY
+            exit 1
+          fi
+      - name: Publish only aggregate reports and plot
+        run: |
+          python - <<'PY'
+          import json, os, shutil
+          from pathlib import Path
+          base = Path(os.environ['RUNNER_TEMP'])
+          private = base / 'banking-private'
+          public = Path(json.loads((private / 'result.json').read_text())['public']).resolve()
+          assert public.is_relative_to(private.resolve())
+          destination = base / 'banking-public'
+          destination.mkdir()
+          allowed = {'banking-report.md', 'banking-summary.json', 'banking-results.png', 'banking-evidence-manifest.json'}
+          assert set(p.name for p in public.iterdir()) == allowed
+          for name in allowed:
+              assert not (public / name).is_symlink()
+              shutil.copyfile(public / name, destination / name)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as report:
+              report.write((destination / 'banking-report.md').read_text())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-banking-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/banking-public/banking-report.md
+            ${{ runner.temp }}/banking-public/banking-summary.json
+            ${{ runner.temp }}/banking-public/banking-results.png
+            ${{ runner.temp }}/banking-public/banking-evidence-manifest.json
+          retention-days: 7
+      - if: always()
+        name: Delete private simulation data and models
+        run: rm -rf -- "$RUNNER_TEMP/banking-private"

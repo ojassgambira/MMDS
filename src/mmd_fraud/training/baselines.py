@@ -17,7 +17,7 @@ from sklearn.preprocessing import StandardScaler
 from mmd_fraud.spark.causal import FEATURES
 
 
-def chronological_split(records: list[dict], train_end: int, validation_end: int) -> dict:
+def chronological_split(records: list[dict], train_end: int, validation_end: int, cutoff_offset: int = 1) -> dict:
     if not 1 <= train_end < validation_end < 49:
         raise ValueError("chronological boundaries must satisfy 1 <= train < validation < 49")
     if len({r["entity_id"] for r in records}) != len(records):
@@ -28,8 +28,8 @@ def chronological_split(records: list[dict], train_end: int, validation_end: int
         step = row["time_step"]
         if not isinstance(step, int) or not 1 <= step <= 49:
             raise ValueError("invalid source time")
-        if row["feature_cutoff_exclusive"] != step + 1:
-            raise ValueError("features must be bounded to their transaction's completed step")
+        if row["feature_cutoff_exclusive"] != step + cutoff_offset:
+            raise ValueError("invalid feature observation boundary")
         if row["label"] == "unknown":
             unknown += 1
             continue
