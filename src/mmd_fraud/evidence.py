@@ -2,10 +2,82 @@
 
 import hashlib
 import json
+import math
 from pathlib import Path
 
 DOMAINS = ("elliptic", "banking")
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def validate_metrics(metrics, domain):
+    """Check aggregate arithmetic without reconstructing AP from a confusion matrix."""
+    matrix = metrics["confusion_matrix"]
+    if (
+        not isinstance(matrix, list)
+        or len(matrix) != 2
+        or any(not isinstance(row, list) or len(row) != 2 for row in matrix)
+        or any(type(n) is not int or n < 0 for row in matrix for n in row)
+    ):
+        raise ValueError("invalid binary confusion matrix")
+    (tn, fp), (fn, tp) = matrix
+    positive = "illicit" if domain == "elliptic" else "sar_positive"
+    if (
+        type(metrics["rows"]) is not int
+        or metrics["rows"] != tn + fp + fn + tp
+        or metrics[positive] != fn + tp
+        or not (tn + fp and fn + tp)
+    ):
+        raise ValueError("confusion matrix population mismatch")
+    expected_order = (
+        ["licit=0", "illicit=1"]
+        if domain == "elliptic"
+        else ["no_simulated_sar_involvement=0", "simulated_sar_involvement=1"]
+    )
+    if metrics["confusion_matrix_order"] != expected_order:
+        raise ValueError("confusion matrix target/order mismatch")
+    expected = {
+        "precision": tp / (tp + fp) if tp + fp else 0,
+        "recall": tp / (tp + fn),
+        "f1": 2 * tp / (2 * tp + fp + fn),
+        "false_positive_rate": fp / (fp + tn),
+    }
+    for name in (*expected, "pr_auc_average_precision"):
+        value = metrics[name]
+        if (
+            type(value) not in (int, float)
+            or not math.isfinite(value)
+            or not 0 <= value <= 1
+            or (name in expected and not math.isclose(value, expected[name], abs_tol=1e-12))
+        ):
+            raise ValueError(f"invalid/inconsistent evidence metric: {name}")
+    threshold = metrics["threshold"]
+    if (
+        type(threshold) not in (int, float)
+        or not math.isfinite(threshold)
+        or not 0 <= threshold <= math.nextafter(1.0, 2.0)
+    ):
+        raise ValueError("invalid evidence threshold")
+
+
+def validate_curve(curve, metrics, domain):
+    positive = "illicit" if domain == "elliptic" else "sar_positive"
+    points = curve["points"]
+    if (
+        curve["rows"] != metrics["rows"]
+        or curve["positive"] != metrics[positive]
+        or not 2 <= len(points) <= 101
+    ):
+        raise ValueError("PR curve population/size mismatch")
+    previous = 1.0
+    for point in points:
+        if set(point) != {"precision", "recall"} or any(
+            type(v) not in (int, float) or not math.isfinite(v) or not 0 <= v <= 1
+            for v in point.values()
+        ):
+            raise ValueError("invalid PR curve point")
+        if point["recall"] > previous:
+            raise ValueError("PR curve recall order mismatch")
+        previous = point["recall"]
 
 
 def load(domain, directory=None):
@@ -31,8 +103,21 @@ def load(domain, directory=None):
             raise ValueError("invalid validation selection")
         for family in run["families"].values():
             m = family["test"]
-            if sum(sum(row) for row in m["confusion_matrix"]) != m["rows"]:
-                raise ValueError("confusion matrix population mismatch")
+            validate_metrics(m, domain)
+            positive = "illicit" if domain == "elliptic" else "sar_positive"
+            for key, split in (
+                ("test", "test"),
+                ("test_fixed", "test"),
+                ("validation", "validation"),
+            ):
+                if key in family:
+                    validate_metrics(family[key], domain)
+                    if any(
+                        family[key][k] != run["split_counts"][split][k] for k in ("rows", positive)
+                    ):
+                        raise ValueError("metric and chronological split populations differ")
+            if "test_curve" in family:
+                validate_curve(family["test_curve"], m, domain)
     return data
 
 
@@ -171,6 +256,10 @@ def load_benchmarks(directory=None):
     ):
         raise ValueError("unsupported benchmark scaling claim")
     for row in data["measurements"]:
-        if row["seconds"] <= 0 or row["output_rows"] != row["nodes"]:
+        if (
+            not math.isfinite(row["seconds"])
+            or row["seconds"] <= 0
+            or row["output_rows"] != row["nodes"]
+        ):
             raise ValueError("invalid Spark benchmark measurement")
     return data

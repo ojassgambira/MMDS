@@ -1,5 +1,13 @@
 # AMLSim feasibility assessment
 
+Current Phase 5/6 status: the **independent synthetic banking fallback has executed**
+in free cloud CI. Official AMLSim has not. Its pinned NetworkX 1.11 import failure
+was reproduced on the supported modern Python stack; see the
+[current assessment and evidence](phase5-banking.md). The notes below are the
+historical Phase 1 review, not the current banking execution status.
+
+## Historical Phase 1 review
+
 Verdict: **simulation deferred; prerequisites unavailable and compatibility
 unverified**. No AMLSim dependency installation or simulation was attempted.
 

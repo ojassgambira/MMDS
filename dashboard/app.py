@@ -128,10 +128,11 @@ elif page == "Transaction graph":
     day = st.slider("Visible step" if domain == "elliptic" else "Visible simulation day", 1, 49, 49)
     focus = st.selectbox("Focus node", ["All nodes", *[n["id"] for n in nodes]])
     arrows = st.checkbox("Show flow arrows (first 150 visible events)", True)
-    graph, edge_count = figure(nodes, edges, day, focus, arrows)
+    provenance = "Operator-provisioned; source unverified" if graph_root else "Generated example"
+    graph, edge_count = figure(nodes, edges, day, focus, arrows, provenance)
     st.plotly_chart(graph, use_container_width=True, config={"scrollZoom": True})
     st.caption(
-        f"{count} generated nodes before focus · {edge_count} visible directed events. Pan, zoom, hover and focus a node. Banking events can repeat; Bitcoin example nodes represent transactions."
+        f"{count} {'operator-provisioned' if graph_root else 'generated'} nodes before focus · {edge_count} visible directed events. Pan, zoom, hover and focus a node. Banking events can repeat; Bitcoin nodes represent transactions."
     )
 elif page == "Temporal patterns":
     st.subheader("Temporal observations")
@@ -290,7 +291,9 @@ else:
     st.subheader("Research methodology and conclusions")
     report = ROOT / "docs/final-research-report.md"
     text = report.read_text() if report.exists() else "Research report is being prepared."
-    st.markdown("\n".join(line for line in text.splitlines() if not line.startswith("![")))
+    from mmd_fraud.report_links import hosted_report
+
+    st.markdown(hosted_report(text, report, ROOT))
     for name in [f"{domain}-evaluation.png", "spark-processing.png"]:
         figure = ROOT / "docs/figures" / name
         if figure.exists():
