@@ -4,6 +4,8 @@
 from pathlib import Path
 import os
 import sys
+import logging
+import platform
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -20,9 +22,19 @@ st.markdown("## MMDS · Financial Graph Research")
 st.caption("Reproducible evidence across two distinct financial graph domains")
 choice = st.sidebar.selectbox("Research domain", ["Elliptic Bitcoin", "Synthetic banking"])
 domain = "elliptic" if choice == "Elliptic Bitcoin" else "banking"
+with st.sidebar.expander("Runtime diagnostics"):
+    st.caption(f"Python {platform.python_version()} · Streamlit {st.__version__}")
+    st.caption("UI-only runtime · no dataset credentials or private models required")
 try:
     evidence = load(domain)
-except (ValueError, OSError, KeyError) as exc:
+except FileNotFoundError:
+    logging.getLogger("mmds.dashboard").exception("Bundled dashboard evidence missing")
+    from mmd_fraud.dashboard_sample import show_sample
+
+    show_sample(domain)
+    st.stop()
+except (ValueError, OSError, KeyError, TypeError) as exc:
+    logging.getLogger("mmds.dashboard").exception("Bundled dashboard evidence rejected")
     st.error(f"Evidence unavailable or invalid: {type(exc).__name__}. No metrics are substituted.")
     st.stop()
 run_index = (

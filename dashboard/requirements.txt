@@ -1,0 +1,2 @@
+# Entry-point-local deployment manifest takes precedence on Community Cloud.
+-r ../requirements-dashboard.lock
