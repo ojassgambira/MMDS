@@ -36,6 +36,7 @@ jobs:
       - run: python -m pip install --no-build-isolation --no-deps -e .
       - run: python -m pip check
       - run: python -m ruff check .
+      - run: python scripts/audit_submission.py
       - env:
           MMDS_TEST_REPORT_DIRECTORY: ${{ runner.temp }}/mmds-evidence
         run: |

@@ -5,15 +5,14 @@ For unattended execution without a Colab session or Drive authorization, use
 an optional route for private persistent artifacts.
 
 The notebook now has one execution cell. Open it in a **free hosted Colab CPU**
-runtime and select **Runtime → Run all**. It automatically loads the automation
-branch before merge (main if that branch has been deleted), installs dependencies
+runtime and select **Runtime → Run all**. It automatically loads the current main branch, installs dependencies
 with isolated dependencies in every cloud runtime, runs tests, acquires the original Elliptic release,
 validates/preprocesses it in Spark, builds temporal graph predictors, trains three
 bounded baselines, computes metrics and writes a report. No workload runs on your
 Mac or iPhone, and no paid compute or storage is provisioned.
 
-[Open the notebook](https://colab.research.google.com/github/ojassgambira/MMDS/blob/fix/issue-7-acquisition/notebooks/MMDS_Cloud_Pipeline.ipynb).
-After branch deletion, open the same notebook from main through Colab's GitHub tab.
+[Open the notebook](https://colab.research.google.com/github/ojassgambira/MMDS/blob/main/notebooks/MMDS_Cloud_Pipeline.ipynb).
+The notebook always fetches main, even if historical fix branches still exist.
 
 ## Browser instructions and unavoidable actions
 
@@ -201,8 +200,7 @@ lines from `bootstrap.log`, `runtime.log`, `worker.log` and the active run's
 credential fields are redacted. It finishes with `pipeline_succeeded = False`
 and an explicit **FAILED** status when work stops; a completed notebook cell
 alone does not mean the pipeline succeeded. Successful runs still display their
-report. This fix branch is selected automatically before merge; after that
-branch is deleted the notebook selects main, avoiding the older automation branch.
+report. The notebook always fetches main and refuses a dirty cloud checkout.
 
 `failure.json` contains an independently readable error and instruction, including
 failures before a run report exists. Preflight validates configuration types,
@@ -269,5 +267,5 @@ versions can correctly produce a new run key.
 
 Tests simulate missing ensurepip and execute real child-process import and
 idempotence checks in Codex Cloud/GitHub CI. They are not actual hosted Colab
-execution or Drive integration. Real dataset validation is a separate bounded
-GitHub-hosted CI job, with no real model training. See [Issue #7 evidence](issue-7.md).
+execution or Drive integration. Real dataset validation and bounded model research now run in separate
+GitHub-hosted CI jobs; see the current final research report. See [Issue #7 evidence](issue-7.md).

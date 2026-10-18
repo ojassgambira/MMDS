@@ -45,7 +45,7 @@ def example(domain, count=60):
     return nodes, edges
 
 
-def figure(nodes, edges, day=49, focus="All nodes", arrows=True):
+def figure(nodes, edges, day=49, focus="All nodes", arrows=True, provenance="Generated example"):
     nodes = [n for n in nodes if n["step"] <= day]
     ids = {n["id"] for n in nodes}
     visible = [e for e in edges if e["step"] <= day and e["source"] in ids and e["target"] in ids]
@@ -96,7 +96,7 @@ def figure(nodes, edges, day=49, focus="All nodes", arrows=True):
                 line=dict(width=1, color="white"),
             ),
             text=[n["id"] for n in nodes],
-            hovertemplate="%{text}<extra>Generated example</extra>",
+            hovertemplate="%{text}<extra>" + provenance + "</extra>",
         )
     )
     fig.update_layout(
@@ -154,4 +154,9 @@ def private_graph(directory, domain):
         e["source"] not in ids or e["target"] not in ids or not 0 <= e["step"] <= 49 for e in edges
     ):
         raise ValueError("invalid private graph endpoint/time")
+    steps = {n["id"]: n["step"] for n in nodes}
+    if any(e["step"] < max(steps[e["source"]], steps[e["target"]]) for e in edges):
+        raise ValueError("private graph edge precedes endpoint availability")
+    if domain == "elliptic" and any(n["step"] == 0 for n in nodes):
+        raise ValueError("Elliptic steps start at one")
     return nodes, edges

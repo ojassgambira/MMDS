@@ -1,6 +1,6 @@
 # Cloud setup
 
-For the current automated workflow use [the Colab/cloud guide](colab.md) and
+For the current automated workflow use [the cloud execution guide](cloud-execution.md) and
 `requirements-cloud.lock`, which includes development and initial baseline
 dependencies. Python 3.11–3.13 compatibility is covered by the current CI matrix.
 The historical Phase 1 environment notes below describe its original setup.

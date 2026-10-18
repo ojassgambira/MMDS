@@ -209,3 +209,10 @@ experiments before making production or multi-worker scaling claims.
 - [Phase 4 protocol](phase4-research.md), [banking protocol](phase5-banking.md),
   [dashboard/cloud access](dashboard.md). Artifact retention is seven days; versioned
   aggregate snapshots and PR summaries retain the measured record afterward.
+
+## Submission navigation
+
+The [evidence-derived results summary](results-summary.md), [architecture diagram](architecture.md),
+[methodology](methodology.md), [cloud installation/execution guide](cloud-execution.md),
+[presentation script](presentation.md) and [final audit](submission-audit.md) complete
+the submission package. These audit additions preserve the verified experiment snapshots.

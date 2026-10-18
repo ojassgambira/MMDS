@@ -15,3 +15,6 @@ spark-warehouse/
 *.parquet
 *.zip
 *.tar.gz
+kaggle.json
+*.joblib
+*.npz
