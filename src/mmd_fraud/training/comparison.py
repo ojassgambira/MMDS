@@ -17,6 +17,7 @@ from sklearn.preprocessing import StandardScaler
 from threadpoolctl import threadpool_limits
 
 from .baselines import chronological_split, evaluate
+from .curves import pr_curve
 from mmd_fraud.data.acquire import sha256
 from mmd_fraud.spark.experiments import FAMILIES
 
@@ -156,6 +157,7 @@ def train_comparison(feature_path: Path, output: Path, cache: Path,
                 np.savez_compressed(output / f'{family}-private-scores.npz',
                                     score=score, y=y['test'],
                                     step=np.array([metadata[i]['time_step'] for i in positions['test']]))
+            item['test_curve'] = pr_curve(y['test'], score)
             item['test'] = evaluate(y['test'], score, item['threshold'])
             item['test_fixed'] = evaluate(y['test'], score)
             joblib.dump(winners[family], output / f'{family}.joblib')

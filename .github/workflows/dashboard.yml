@@ -1,0 +1,57 @@
+name: Dashboard and Spark benchmark validation
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: dashboard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  ui-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: python -m pip install -r requirements-dashboard.lock
+      - run: python -m pip check
+      - name: Verify lightweight hosting dependency boundary
+        run: python -c "import importlib.util; assert importlib.util.find_spec('pyspark') is None; assert importlib.util.find_spec('sklearn') is None"
+      - run: python scripts/dashboard_smoke.py
+  spark-benchmarks:
+    if: github.repository == 'ojassgambira/MMDS' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SPARK_LOCAL_IP: 127.0.0.1
+      PYSPARK_PYTHON: python
+      OMP_NUM_THREADS: '2'
+      OPENBLAS_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: python -m pip install -r requirements-cloud.lock
+      - run: python -m pip install --no-build-isolation --no-deps -e .
+      - run: python scripts/benchmark_spark.py --workspace "$RUNNER_TEMP/benchmark-private"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: measured-local-spark-benchmarks
+          path: ${{ runner.temp }}/benchmark-private/spark-benchmarks.json
+          retention-days: 7
+      - if: always()
+        run: rm -rf -- "$RUNNER_TEMP/benchmark-private"

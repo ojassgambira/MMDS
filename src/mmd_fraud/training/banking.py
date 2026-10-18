@@ -14,6 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from threadpoolctl import threadpool_limits
 
 from .baselines import evaluate
+from .curves import pr_curve
 from .comparison import validation_threshold
 from mmd_fraud.spark.banking_research import FAMILIES
 
@@ -44,6 +45,7 @@ def anomaly(feature_path: Path, output: Path):
     restored = joblib.load(output / "isolation_forest.joblib")
     np.testing.assert_allclose(expit(-restored.decision_function(x[test])), test_score)
     result = {
+        "test_curve": pr_curve(y[test], test_score),
         "fit_seconds": time.monotonic() - began,
         "threshold": threshold,
         "validation": evaluate(y[val], score, threshold),

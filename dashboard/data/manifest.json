@@ -1,0 +1,7 @@
+{
+  "sha256": {
+    "elliptic.json": "5d5e39c1bfe7058b20e044704f14fcf31545e4b41dd786882f6bf911c39ad8ad",
+    "banking.json": "ba6529870d47e603d804c4936474f3a0ea41b62a348df81a86d9d7b3f879a73e",
+    "spark-benchmarks.json": "3bd8f94a33f3c1ae0900807d4a19bee0fcf9de1860c2a16d42cef295ee610f27"
+  }
+}
