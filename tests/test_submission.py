@@ -11,6 +11,7 @@ import unittest
 from mmd_fraud.diagnostics import redact
 from mmd_fraud.evidence import ROOT, load, validate_metrics, validate_curve
 from mmd_fraud.dashboard_graph import private_graph, figure
+from mmd_fraud.report_links import hosted_report
 
 spec = importlib.util.spec_from_file_location(
     "submission_audit", ROOT / "scripts/audit_submission.py"
@@ -20,6 +21,20 @@ spec.loader.exec_module(audit)
 
 
 class SubmissionTests(unittest.TestCase):
+    def test_embedded_report_links_resolve_to_canonical_repository(self):
+        text = hosted_report(
+            "[Guide](dashboard.md) [README](../README.md#dashboard) "
+            "[web](https://example.com) [anchor](#scope)",
+            ROOT / "docs/final-research-report.md",
+            ROOT,
+        )
+        self.assertIn("blob/main/docs/dashboard.md", text)
+        self.assertIn("blob/main/README.md#dashboard", text)
+        self.assertIn("[web](https://example.com)", text)
+        self.assertIn("[anchor](#scope)", text)
+        with self.assertRaises(ValueError):
+            hosted_report("[escape](../../private.txt)", ROOT / "docs/report.md", ROOT)
+
     def test_submission_package_matches_evidence_and_links(self):
         result = audit.audit()
         self.assertEqual(result["status"], "passed")

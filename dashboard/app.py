@@ -291,7 +291,9 @@ else:
     st.subheader("Research methodology and conclusions")
     report = ROOT / "docs/final-research-report.md"
     text = report.read_text() if report.exists() else "Research report is being prepared."
-    st.markdown("\n".join(line for line in text.splitlines() if not line.startswith("![")))
+    from mmd_fraud.report_links import hosted_report
+
+    st.markdown(hosted_report(text, report, ROOT))
     for name in [f"{domain}-evaluation.png", "spark-processing.png"]:
         figure = ROOT / "docs/figures" / name
         if figure.exists():

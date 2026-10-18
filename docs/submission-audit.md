@@ -13,6 +13,7 @@ results are recorded in the accompanying pull request and its GitHub checks.
 | Evidence integrity | Hashes/population totals alone did not detect internally inconsistent published metrics; added binary matrix, target order, positive counts, finite score arithmetic and curve population/order checks |
 | Graph provenance | Private graph hover/count text said generated; now shows operator-provisioned unverified provenance; rejects edges before endpoint availability |
 | Secret diagnostics | Quoted JSON credential fields escaped earlier redaction; added structured-value redaction and regression cases |
+| Embedded report links | Relative documentation links resolved against the Streamlit host; map them to canonical GitHub main files while figures render through the UI |
 | Results consistency | Added deterministic evidence-derived results summary and a stale-table regression guard; existing metric snapshots unchanged |
 | Submission package | Added cloud installation/execution guide, methodology, current architecture diagram, presentation script and this audit |
 | CI | Submission audit runs in the supported-Python matrix; tests check document links, notebook routing, aggregate semantics and security failure cases |
