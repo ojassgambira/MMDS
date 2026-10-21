@@ -69,5 +69,7 @@ export default function Chart({ label, data, layout = {}, onClick }) {
     };
   }, [data, layout, onClick]);
   if (error) return <p role="alert">Chart could not render: {error}</p>;
-  return <div className="chart" role="img" aria-label={label} ref={target} />;
+  return (
+    <div className="chart" role="figure" aria-label={label} ref={target} />
+  );
 }

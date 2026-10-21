@@ -16,12 +16,20 @@ for (const domain of ["elliptic", "banking"]) {
         failed = [],
         external = [];
       browser.on("pageerror", (e) => errors.push(e.message));
+      browser.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+      });
+      browser.on("requestfailed", (request) => failed.push(request.url()));
       browser.on("response", (r) => {
         if (r.status() >= 400) failed.push(r.url());
       });
       browser.on("request", (r) => {
         if (
-          !r.url().startsWith("http://127.0.0.1:4173/") &&
+          !r
+            .url()
+            .startsWith(
+              process.env.MMDS_LIVE_URL ?? "http://127.0.0.1:4173/",
+            ) &&
           !r.url().startsWith("blob:")
         )
           external.push(r.url());
