@@ -39,7 +39,8 @@ a:focus-visible,
 button:focus-visible,
 select:focus-visible,
 input:focus-visible,
-summary:focus-visible {
+summary:focus-visible,
+.table-scroll:focus-visible {
   outline: 3px solid #ca992f;
   outline-offset: 4px;
 }
@@ -138,7 +139,7 @@ nav a.active {
 }
 .nav-index {
   font-size: 10px;
-  color: #7faaa9;
+  color: #a7ceca;
   font-variant-numeric: tabular-nums;
 }
 .sidebar-bottom {
@@ -180,12 +181,12 @@ header {
   font-size: 9px;
   letter-spacing: 1.9px;
   font-weight: 750;
-  color: #60828a;
+  color: #496870;
   margin-bottom: 13px;
 }
 .subtitle {
   font-size: 13px;
-  color: #68818a;
+  color: #496870;
   margin-bottom: 0;
 }
 .selectors {
@@ -221,7 +222,7 @@ select {
   gap: 13px;
   align-items: center;
   font-size: 11px;
-  color: #637d84;
+  color: #496870;
   margin-bottom: 25px;
 }
 .badge {
@@ -237,7 +238,7 @@ select {
   background: #e3f3ed;
 }
 .badge.banking {
-  color: #966522;
+  color: #805314;
   background: #fcf0d7;
 }
 .metrics {
@@ -259,7 +260,7 @@ select {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  color: #738b91;
+  color: #496870;
   font-weight: 650;
 }
 .metric > strong {
@@ -274,7 +275,7 @@ select {
 }
 .metric > small {
   font-size: 10px;
-  color: #5d767e;
+  color: #496870;
   margin-top: 6px;
 }
 .grid {
@@ -306,7 +307,7 @@ select {
   font-size: 11px;
 }
 .muted {
-  color: #5d767e;
+  color: #496870;
 }
 .model-name {
   font-size: 22px;
@@ -319,7 +320,7 @@ select {
   font-size: 11px;
   font-weight: 400;
   display: block;
-  color: #5d767e;
+  color: #496870;
   margin-top: 6px;
   letter-spacing: 0;
 }
@@ -368,7 +369,7 @@ select {
 }
 .timeline span {
   font-size: 10px;
-  color: #5d767e;
+  color: #496870;
 }
 .evidence-mark {
   padding: 12px;
@@ -426,11 +427,11 @@ caption {
   caption-side: bottom;
   text-align: left;
   padding: 14px 0 3px;
-  color: #5d767e;
+  color: #496870;
   font-size: 10px;
 }
 th {
-  color: #7b9296;
+  color: #496870;
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -548,8 +549,6 @@ input[type="range"] {
   color: #234850;
 }
 .markdown table {
-  display: block;
-  overflow-x: auto;
   margin: 20px 0;
 }
 .markdown pre {
@@ -571,7 +570,7 @@ footer {
   padding: 30px 0 22px;
   margin-top: 30px;
   border-top: 1px solid #dce5df;
-  color: #5d767e;
+  color: #496870;
   display: flex;
   justify-content: space-between;
   gap: 15px;
@@ -583,7 +582,7 @@ footer small {
   font-size: 9px;
 }
 footer a {
-  color: #64878b;
+  color: #426c71;
 }
 .fatal {
   max-width: 720px;

@@ -48,7 +48,12 @@ function Metric({ label, value, note }) {
 }
 function Table({ headers, rows, caption }) {
   return (
-    <div className="table-scroll">
+    <div
+      className="table-scroll"
+      tabIndex={0}
+      role="region"
+      aria-label={caption ?? `${headers[0]} table`}
+    >
       <table>
         {caption && <caption>{caption}</caption>}
         <thead>
@@ -792,7 +797,22 @@ function Research({ assets, domain }) {
       </div>
       <Panel title="Research evaluation" wide>
         <article className="markdown">
-          <Markdown remarkPlugins={[remarkGfm]} skipHtml>
+          <Markdown
+            remarkPlugins={[remarkGfm]}
+            skipHtml
+            components={{
+              table: ({ children }) => (
+                <div
+                  className="table-scroll"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Research results table"
+                >
+                  <table>{children}</table>
+                </div>
+              ),
+            }}
+          >
             {assets["report.json"].markdown}
           </Markdown>
         </article>

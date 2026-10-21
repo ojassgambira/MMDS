@@ -85,3 +85,15 @@ jobs:
           PAGES_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_COMMIT: ${{ github.sha }}
         run: node frontend/tests/verify-live.mjs
+      - name: Live desktop/mobile interactions and automated accessibility
+        env:
+          MMDS_LIVE_URL: https://ojassgambira.github.io/MMDS/
+        run: npm run test:browser --prefix frontend
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-dashboard-browser-evidence
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
