@@ -3,8 +3,17 @@
 `dashboard/app.py` is a read-only Streamlit application. It serves versioned,
 hash-verified aggregate evidence for real Elliptic and independent synthetic banking.
 It never acquires datasets, trains models, runs Spark, loads pickles or executes
-uploaded code. Root `requirements.txt` installs only `requirements-dashboard.lock`;
+uploaded code. Root `requirements.txt` and entry-point `dashboard/requirements.txt` both select
+only `requirements-dashboard.lock`;
 no Java, Spark or training stack is needed to host it.
+
+## Reported live deployment failure
+
+The owner has now reported a deployed URL showing a generic hosting error.
+Successful public execution is still unverified. See the
+[production startup investigation](streamlit-deployment.md) for reproduced
+browser checks, evidence fallback behavior and the exact owner-only information
+needed to diagnose the live service. No live root cause is inferred from that page.
 
 ## Free browser hosting
 
@@ -103,3 +112,13 @@ In the full managed cloud development environment, run
 from hash-verified aggregate snapshots without downloading datasets or rerunning
 training. Matplotlib is a development/report dependency; the lightweight hosted
 dashboard only reads the resulting images.
+
+## Real-browser production validation
+
+The dashboard workflow additionally installs a clean UI-only server environment,
+without an editable project/Spark/sklearn, and uses real Chromium sessions on
+Python 3.12/3.13. It visits both domains/all pages from root and entry-point working
+directories and tests missing/corrupt evidence. This supplements AppTest and HTTP
+health checks; it does not establish a working public deployment. Missing aggregate
+files show labeled illustrations without scores; corrupt evidence still fails closed.
+See the [production reproduction command](streamlit-deployment.md).

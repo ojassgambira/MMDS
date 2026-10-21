@@ -47,6 +47,7 @@ graphs are explicitly generated illustrations; optional operator-authorized
 subgraphs remain outside Git. No raw data, prediction arrays or models are served.
 
 [Dashboard access and free hosting instructions](docs/dashboard.md).
+[Reported deployment failure and production-browser investigation](docs/streamlit-deployment.md).
 The app has cloud HTTP and Streamlit integration tests; **no public dashboard URL
 is currently verified**. Free Streamlit Community Cloud deployment requires
 external GitHub authorization. Use `dashboard/app.py`, Python 3.13 and root
