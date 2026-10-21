@@ -85,6 +85,16 @@ jobs:
           PAGES_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_COMMIT: ${{ github.sha }}
         run: node frontend/tests/verify-live.mjs
+      - name: Download the verified build artifact for frozen browser expectations
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/expected-pages
+      - name: Restore only published aggregate expectations
+        run: |
+          mkdir -p "$RUNNER_TEMP/expected-site" frontend/public
+          tar --extract --file "$RUNNER_TEMP/expected-pages/artifact.tar" --directory "$RUNNER_TEMP/expected-site" --no-same-owner --no-same-permissions
+          cp -R "$RUNNER_TEMP/expected-site/data" frontend/public/data
       - name: Live desktop/mobile interactions and automated accessibility
         env:
           MMDS_LIVE_URL: https://ojassgambira.github.io/MMDS/
