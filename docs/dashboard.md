@@ -1,5 +1,8 @@
 # Dashboard access and operation
 
+For the primary static browser dashboard and automatic Pages deployment, see
+[GitHub Pages](github-pages.md). This document describes the retained Streamlit fallback.
+
 `dashboard/app.py` is a read-only Streamlit application. It serves versioned,
 hash-verified aggregate evidence for real Elliptic and independent synthetic banking.
 It never acquires datasets, trains models, runs Spark, loads pickles or executes

@@ -69,6 +69,13 @@ specific rubric, cover sheet, student details, slide/PDF format and upload porta
 were not supplied; compliance with an unseen rubric cannot be verified. No
 student/institution details or final upload are fabricated.
 
+## Static hosting migration
+
+The [GitHub Pages dashboard](github-pages.md) preserves the public research views
+without a Python server. Streamlit remains a fallback. Pages publication and its
+post-merge verification are separately reported; the historical Streamlit boundaries
+below remain accurate for that optional implementation.
+
 ## Remaining external boundaries
 
 **Public dashboard hosting:** cloud integration and HTTP tests do not establish a

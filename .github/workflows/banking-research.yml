@@ -2,9 +2,9 @@ name: Synthetic banking research
 on:
   push:
     branches: [main]
-    paths-ignore: ["dashboard/**", "docs/**", ".streamlit/**"]
+    paths-ignore: ["dashboard/**", "docs/**", ".streamlit/**", "frontend/**", ".github/workflows/pages.yml"]
   pull_request:
-    paths-ignore: ["dashboard/**", "docs/**", ".streamlit/**"]
+    paths-ignore: ["dashboard/**", "docs/**", ".streamlit/**", "frontend/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 concurrency:
   group: banking-${{ github.event.pull_request.number || github.ref }}
