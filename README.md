@@ -38,7 +38,17 @@ three seeds: mean AP **0.432368**, F1 **0.501451**, recall **0.575433**, FPR **0
 These are arithmetic seed means, not pooled real-bank predictions. Performance
 varies substantially across seeds and does not establish real-world efficacy.
 
-## Dashboard
+## GitHub Pages dashboard
+
+The primary browser dashboard is migrating to a static React/Vite/Plotly build on
+GitHub Pages. Target URL: **https://ojassgambira.github.io/MMDS/**; public deployment
+success is established only by the post-deploy workflow/browser verification.
+[Architecture, export privacy, automated deployment and one-time Pages authorization](docs/github-pages.md).
+The browser only renders public aggregates and clearly labeled illustrative graphs;
+all Python, Spark and ML remain in cloud CI. The existing Streamlit dashboard and
+its research functionality remain available as an optional fallback.
+
+## Streamlit fallback dashboard
 
 The Streamlit app provides six pages per domain: statistics, interactive directed
 graph exploration, temporal patterns, model comparisons/confusion matrices and

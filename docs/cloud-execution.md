@@ -1,5 +1,10 @@
 # Installation and cloud execution guide
 
+The primary browser implementation is a [static GitHub Pages build](github-pages.md);
+publication is verified separately after merge and Pages authorization.
+Its workflow exports verified aggregates and tests browser views; the Python/ML
+pipelines below remain cloud-only. Streamlit is retained as a fallback.
+
 All shell commands here run **only in Codex Cloud or free authorized cloud
 infrastructure**. A Mac or iPhone is only a browser client. No paid/GPU resources
 are used. Supported full stack: Python 3.11–3.13, Java 17 or 21, Spark 4.0.1.
